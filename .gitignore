@@ -179,3 +179,8 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# Pipeline runs (generated images and manifests)
+outputs/
+
+# macOS
+.DS_Store

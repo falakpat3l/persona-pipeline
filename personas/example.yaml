@@ -1,0 +1,41 @@
+# Example persona. Mira Vale is fictional; copy this file to create your own.
+
+persona:
+  name: Mira Vale
+  tagline: design notes from a digital creator
+  bio: >
+    Mira is a virtual creator who shares small, practical ideas about design,
+    technology and calm daily habits.
+
+  style:
+    subject: >
+      a young woman with shoulder-length dark wavy hair, hazel eyes,
+      soft freckles, calm confident expression
+    signature:
+      - layered gold jewellery
+      - deep teal clothing
+      - one small tech object in frame
+    lighting: warm golden-hour window light
+    camera: 50mm portrait lens, shallow depth of field, film grain
+    avoid:
+      - text or watermarks
+      - extra fingers or distorted hands
+      - plastic skin
+      - cluttered background
+
+  voice:
+    tone: warm, curious, a little playful, never salesy
+    language: English
+    max_caption_chars: 300
+    emoji_level: low
+    base_hashtags: [digitalcreator, designthinking]
+    max_hashtags: 10
+
+pipeline:
+  backends:
+    text: mock
+    image: mock
+    vision: mock
+  output_dir: outputs
+  critic_threshold: 7.0
+  max_attempts: 3
