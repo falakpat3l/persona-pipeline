@@ -38,8 +38,9 @@ pipeline:
     vision: mock
   gemini:
     text_model: gemini-3.8-flash
+    fallback_models: [gemini-3.5-flash, gemini-3.5-flash-lite]
     temperature: 0.9
-    max_retries: 4
+    max_retries: 3
   output_dir: outputs
   critic_threshold: 7.0
   max_attempts: 3

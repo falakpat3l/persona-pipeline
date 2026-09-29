@@ -19,7 +19,7 @@ def with_retries(
     base_delay: float = 1.0,
     max_delay: float = 30.0,
     is_retryable: Callable[[Exception], bool] = lambda exc: True,
-    sleep: Callable[[float], None] = time.sleep,
+    sleep: Callable[[float], None] | None = None,
     label: str = "call",
 ) -> T:
     """Call `fn` until it succeeds, retrying only errors that `is_retryable` accepts.
@@ -27,6 +27,7 @@ def with_retries(
     Waits base_delay * 2^n seconds (capped at max_delay, plus up to 25% jitter)
     between attempts. `sleep` is injectable so tests run instantly.
     """
+    sleep = sleep or time.sleep
     for attempt in range(1, attempts + 1):
         try:
             return fn()

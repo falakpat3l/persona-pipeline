@@ -51,8 +51,12 @@ class GeminiSettings(BaseModel):
     """Options for the Gemini backends. The API key comes from GEMINI_API_KEY."""
 
     text_model: str = "gemini-3.8-flash"
+    # Tried in order when the main model stays overloaded (503) or rate limited (429).
+    fallback_models: list[str] = Field(
+        default_factory=lambda: ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+    )
     temperature: float = Field(default=0.9, ge=0, le=2)
-    max_retries: int = Field(default=4, ge=1)
+    max_retries: int = Field(default=3, ge=1)
     timeout_s: float = Field(default=60, gt=0)
 
 

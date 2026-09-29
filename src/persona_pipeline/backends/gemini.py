@@ -12,6 +12,7 @@ malformed replies with exponential backoff.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -19,6 +20,8 @@ from typing import Any
 from persona_pipeline.backends.base import BackendError
 from persona_pipeline.config import PipelineSettings
 from persona_pipeline.retry import with_retries
+
+log = logging.getLogger("persona_pipeline")
 
 API_KEY_VARS = ("GEMINI_API_KEY", "GOOGLE_API_KEY")
 RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
@@ -55,8 +58,24 @@ def parse_json_reply(text: str | None, schema: dict[str, Any]) -> dict:
     return data
 
 
+# Transient network failures from the HTTP layer (httpx), matched by name so this
+# module does not need to import httpx.
+TRANSIENT_NETWORK_ERRORS = {
+    "ConnectError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "WriteTimeout",
+    "PoolTimeout",
+    "ReadError",
+    "RemoteProtocolError",
+}
+
+
 def is_retryable(exc: Exception) -> bool:
+    """Retry rate limits, server errors, dropped connections and malformed replies."""
     if isinstance(exc, MalformedOutput):
+        return True
+    if type(exc).__name__ in TRANSIENT_NETWORK_ERRORS:
         return True
     code = getattr(exc, "code", None)
     return isinstance(code, int) and code in RETRYABLE_STATUS
@@ -68,6 +87,8 @@ class _GeminiBase:
     def __init__(self, settings: PipelineSettings | None = None, client: Any = None):
         self.settings = (settings or PipelineSettings()).gemini
         self._client = client  # injected in tests; created lazily otherwise
+        self.last_model: str | None = None  # which model actually answered
+        self._sticky_model: str | None = None  # fallback that worked earlier in this run
 
     @property
     def client(self):
@@ -88,25 +109,47 @@ class _GeminiBase:
     def _generate_json(
         self, task: str, model: str, contents: Any, system: str, schema: dict[str, Any]
     ) -> dict:
+        """Call `model`, and if it stays overloaded after retries, fall back down the list."""
         config = {
             "system_instruction": system,
             "temperature": self.settings.temperature,
             "response_mime_type": "application/json",
             "response_json_schema": schema,
+            # We never pass tools, so switch off automatic function calling (and its log noise).
+            "automatic_function_calling": {"disable": True},
         }
+        chain = [model] + [m for m in self.settings.fallback_models if m != model]
+        # Sticky fallback: once a model was overloaded in this run, start from the
+        # model that worked instead of waiting on the busy one again.
+        if self._sticky_model in chain:
+            chain = chain[chain.index(self._sticky_model) :]
 
-        def call() -> dict:
-            response = self.client.models.generate_content(
-                model=model, contents=contents, config=config
-            )
-            return parse_json_reply(getattr(response, "text", None), schema)
+        for i, current in enumerate(chain):
 
-        return with_retries(
-            call,
-            attempts=self.settings.max_retries,
-            is_retryable=is_retryable,
-            label=f"gemini:{task}",
-        )
+            def call(current: str = current) -> dict:
+                response = self.client.models.generate_content(
+                    model=current, contents=contents, config=config
+                )
+                return parse_json_reply(getattr(response, "text", None), schema)
+
+            try:
+                result = with_retries(
+                    call,
+                    attempts=self.settings.max_retries,
+                    is_retryable=is_retryable,
+                    label=f"gemini:{task}:{current}",
+                )
+            except Exception as exc:
+                is_last = i == len(chain) - 1
+                if is_last or not is_retryable(exc):
+                    raise
+                log.warning("  %s unavailable (%s), falling back to %s", current, exc, chain[i + 1])
+                continue
+            self.last_model = current
+            if current != model:
+                self._sticky_model = current
+            return result
+        raise AssertionError("unreachable")  # pragma: no cover
 
 
 class GeminiText(_GeminiBase):

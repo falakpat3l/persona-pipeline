@@ -49,6 +49,7 @@ def no_sleep(monkeypatch):
 
 def make_backend(replies, **gemini):
     settings = PipelineSettings()
+    settings.gemini.fallback_models = []  # single model unless a test opts in
     for key, value in gemini.items():
         setattr(settings.gemini, key, value)
     client = FakeClient(replies)
@@ -94,6 +95,15 @@ def test_malformed_output_is_retryable():
     assert is_retryable(MalformedOutput("x"))
 
 
+def test_dropped_connections_are_retryable_but_proxy_refusals_are_not():
+    ReadTimeout = type("ReadTimeout", (Exception,), {})
+    ConnectError = type("ConnectError", (Exception,), {})
+    ProxyError = type("ProxyError", (Exception,), {})
+    assert is_retryable(ReadTimeout())
+    assert is_retryable(ConnectError())
+    assert not is_retryable(ProxyError())  # a blocked network will not fix itself
+
+
 # GeminiText
 
 
@@ -127,6 +137,57 @@ def test_gives_up_after_max_retries():
 
 def test_does_not_retry_bad_request():
     backend, client = make_backend([FakeAPIError(400), "unused"])
+    with pytest.raises(FakeAPIError):
+        backend.complete_json("t", "s", "p", SCHEMA)
+    assert len(client.calls) == 1
+
+
+def test_falls_back_to_next_model_when_overloaded():
+    backend, client = make_backend(
+        [FakeAPIError(503), FakeAPIError(503), '{"positive": "p", "negative": "n"}'],
+        text_model="big",
+        fallback_models=["small", "tiny"],
+        max_retries=2,
+    )
+    assert backend.complete_json("t", "s", "p", SCHEMA)["positive"] == "p"
+    assert [c["model"] for c in client.calls] == ["big", "big", "small"]
+    assert backend.last_model == "small"
+
+
+def test_fallback_is_sticky_for_the_rest_of_the_run():
+    backend, client = make_backend(
+        [
+            FakeAPIError(503),
+            FakeAPIError(503),
+            '{"positive": "p", "negative": "n"}',  # stage 1 answered by "small"
+            '{"positive": "p2", "negative": "n2"}',  # stage 2 goes straight to "small"
+        ],
+        text_model="big",
+        fallback_models=["small"],
+        max_retries=2,
+    )
+    backend.complete_json("write_prompt", "s", "p", SCHEMA)
+    backend.complete_json("write_caption", "s", "p", SCHEMA)
+    assert [c["model"] for c in client.calls] == ["big", "big", "small", "small"]
+
+
+def test_disables_automatic_function_calling():
+    backend, client = make_backend(['{"positive": "p", "negative": "n"}'])
+    backend.complete_json("t", "s", "p", SCHEMA)
+    assert client.calls[0]["config"]["automatic_function_calling"] == {"disable": True}
+
+
+def test_raises_when_every_model_is_overloaded():
+    backend, client = make_backend(
+        [FakeAPIError(503)] * 4, text_model="big", fallback_models=["small"], max_retries=2
+    )
+    with pytest.raises(FakeAPIError):
+        backend.complete_json("t", "s", "p", SCHEMA)
+    assert [c["model"] for c in client.calls] == ["big", "big", "small", "small"]
+
+
+def test_bad_request_does_not_trigger_fallback():
+    backend, client = make_backend([FakeAPIError(400)], text_model="big", fallback_models=["small"])
     with pytest.raises(FakeAPIError):
         backend.complete_json("t", "s", "p", SCHEMA)
     assert len(client.calls) == 1

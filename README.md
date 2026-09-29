@@ -102,7 +102,7 @@ outputs/20260928-074819-three-tiny-habits-for-deep-focus/
 
 Every Gemini call uses structured output (a JSON schema per stage), checks the
 reply before the next stage sees it, and retries rate limits (429), server errors
-(5xx) and malformed replies with exponential backoff and jitter. `.env` is
+(5xx), dropped connections and malformed replies with exponential backoff and jitter. `.env` is
 git-ignored, so the key never lands in the repo.
 
 Pick backends in the persona file, or override per run:

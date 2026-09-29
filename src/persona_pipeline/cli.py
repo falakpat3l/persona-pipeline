@@ -77,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(message)s",
     )
+    if not args.verbose:
+        # Keep the output to our own stage log; SDK and HTTP chatter only with -v.
+        for noisy in ("httpx", "httpcore", "google_genai", "google.genai"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
     return args.func(args)
 
 
