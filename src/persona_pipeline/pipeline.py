@@ -53,12 +53,13 @@ def make_job_id(topic: str, now: datetime | None = None) -> str:
 class Pipeline:
     def __init__(self, config: Config, stages: Sequence[Stage] | None = None):
         self.config = config
-        choice = config.pipeline.backends
+        settings = config.pipeline
+        choice = settings.backends
         self.ctx = StageContext(
             config=config,
-            text=backends.create("text", choice.text),
-            image=backends.create("image", choice.image),
-            vision=backends.create("vision", choice.vision),
+            text=backends.create("text", choice.text, settings),
+            image=backends.create("image", choice.image, settings),
+            vision=backends.create("vision", choice.vision, settings),
         )
         self.stages: list[Stage] = list(stages) if stages else [cls() for cls in DEFAULT_STAGES]
 
@@ -88,7 +89,10 @@ class Pipeline:
         except Exception as exc:  # record every failure in the trace
             detail = f"{type(exc).__name__}: {exc}"
             status = StageStatus.FAILED
-            log.exception("stage %s failed", stage.name)
+            if isinstance(exc, backends.BackendError):
+                log.error("stage %s failed: %s", stage.name, exc)  # known, readable error
+            else:
+                log.exception("stage %s failed", stage.name)  # unexpected: show traceback
         duration = (time.perf_counter() - t0) * 1000
         job.events.append(
             StageEvent(

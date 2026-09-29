@@ -7,11 +7,19 @@ from persona_pipeline.stages.base import Stage, StageContext
 
 ASPECT_BY_FORMAT = {"portrait": "4:5", "square": "1:1", "story": "9:16"}
 
-SYSTEM = (
-    "You are an art director for a virtual persona's social media. "
-    "Write one text-to-image prompt that keeps the persona's look consistent "
-    "and tells the topic visually. Reply only with JSON."
-)
+SYSTEM = """\
+You are the art director for a virtual persona's social media account.
+Write ONE text-to-image prompt for a single photo that tells the topic visually.
+
+Rules:
+- Start with the persona's subject description, copied exactly, so the face stays consistent.
+- Include every signature element, worded exactly as given.
+- Then describe setting, action or pose, composition, lighting and camera.
+- Show the topic through the scene and props, never through written words in the image.
+- 60 to 120 words, comma-separated phrases, no quotation marks.
+- If a "Fix" line is given, the previous image had those problems: correct them.
+- "negative" lists things to keep out of the image, including everything under Avoid.
+Reply only with JSON."""
 
 SCHEMA = {
     "type": "object",

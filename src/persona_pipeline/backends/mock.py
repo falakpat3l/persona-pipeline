@@ -34,9 +34,14 @@ def _field(text: str, label: str, default: str = "") -> str:
     return match.group(1).strip() if match else default
 
 
-class MockText:
+class _MockBase:
     name = "mock"
 
+    def __init__(self, settings=None):
+        self.settings = settings
+
+
+class MockText(_MockBase):
     def complete_json(self, task: str, system: str, prompt: str, schema: dict[str, Any]) -> dict:
         topic = _field(prompt, "Topic", "an idea")
         subject = _field(prompt, "Subject", "a creator")
@@ -65,9 +70,7 @@ class MockText:
         raise ValueError(f"MockText has no canned answer for task '{task}'")
 
 
-class MockImage:
-    name = "mock"
-
+class MockImage(_MockBase):
     def generate(self, prompt: ImagePrompt, out_path: Path) -> GeneratedImage:
         width, height = ASPECT_SIZES.get(prompt.aspect_ratio, ASPECT_SIZES["4:5"])
         seed = _digest(prompt.positive, str(prompt.seed))
@@ -91,9 +94,7 @@ class MockImage:
         return GeneratedImage(path=out_path, width=width, height=height, backend=self.name)
 
 
-class MockVision:
-    name = "mock"
-
+class MockVision(_MockBase):
     def inspect_json(
         self, task: str, image_path: Path, instruction: str, schema: dict[str, Any]
     ) -> dict:

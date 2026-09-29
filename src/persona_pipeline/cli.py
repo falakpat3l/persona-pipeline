@@ -13,6 +13,7 @@ from pathlib import Path
 
 from persona_pipeline import __version__, backends
 from persona_pipeline.config import load_config
+from persona_pipeline.env import load_dotenv
 from persona_pipeline.models import Brief
 from persona_pipeline.pipeline import Pipeline
 
@@ -71,6 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    load_dotenv()  # picks up GEMINI_API_KEY etc. from ./.env if present
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(message)s",

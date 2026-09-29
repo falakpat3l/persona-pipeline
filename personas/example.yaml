@@ -33,9 +33,13 @@ persona:
 
 pipeline:
   backends:
-    text: mock
+    text: mock     # set to "gemini" once GEMINI_API_KEY is in .env
     image: mock
     vision: mock
+  gemini:
+    text_model: gemini-3.8-flash
+    temperature: 0.9
+    max_retries: 4
   output_dir: outputs
   critic_threshold: 7.0
   max_attempts: 3

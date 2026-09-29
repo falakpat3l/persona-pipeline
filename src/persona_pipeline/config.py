@@ -47,8 +47,18 @@ class BackendChoice(BaseModel):
     vision: str = "mock"
 
 
+class GeminiSettings(BaseModel):
+    """Options for the Gemini backends. The API key comes from GEMINI_API_KEY."""
+
+    text_model: str = "gemini-3.8-flash"
+    temperature: float = Field(default=0.9, ge=0, le=2)
+    max_retries: int = Field(default=4, ge=1)
+    timeout_s: float = Field(default=60, gt=0)
+
+
 class PipelineSettings(BaseModel):
     backends: BackendChoice = Field(default_factory=BackendChoice)
+    gemini: GeminiSettings = Field(default_factory=GeminiSettings)
     output_dir: Path = Path("outputs")
     critic_threshold: float = Field(default=7.0, ge=0, le=10)
     max_attempts: int = Field(default=3, ge=1)

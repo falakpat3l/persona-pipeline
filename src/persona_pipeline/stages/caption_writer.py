@@ -29,7 +29,12 @@ class CaptionWriter(Stage):
         system = (
             f"You write Instagram captions as {persona.name}. {persona.bio} "
             f"Tone: {voice.tone}. Language: {voice.language}. Emoji use: {voice.emoji_level}. "
-            f"Keep the caption under {voice.max_caption_chars} characters. Reply only with JSON."
+            f"Keep the caption under {voice.max_caption_chars} characters. "
+            "Open with a short hook line, give one useful idea about the topic, and end with "
+            "a light question to invite comments. "
+            f"Suggest up to {voice.max_hashtags} specific hashtags without the # sign. "
+            "alt_text describes the image plainly for screen readers in one sentence. "
+            "Reply only with JSON."
         )
         prompt = "\n".join(
             [

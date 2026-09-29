@@ -78,11 +78,32 @@ outputs/20260928-074819-three-tiny-habits-for-deep-focus/
 
 ## Backends
 
-| Role   | Available now | Planned                        |
-| ------ | ------------- | ------------------------------ |
-| text   | `mock`        | `gemini`                       |
-| image  | `mock`        | `gemini`, `drawthings` (local) |
-| vision | `mock`        | `gemini`                       |
+| Role   | Available now    | Planned                        |
+| ------ | ---------------- | ------------------------------ |
+| text   | `mock`, `gemini` |                                |
+| image  | `mock`           | `drawthings` (local), `gemini` |
+| vision | `mock`           | `gemini`                       |
+
+### Using Gemini
+
+1. Get a free API key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. Install the extra and add your key:
+
+   ```bash
+   pip install -e ".[gemini]"
+   echo "GEMINI_API_KEY=your-key-here" > .env
+   ```
+
+3. Run with Gemini writing the prompt and caption:
+
+   ```bash
+   persona-pipeline run --persona personas/example.yaml --topic "Three tiny habits for deep focus" --text gemini
+   ```
+
+Every Gemini call uses structured output (a JSON schema per stage), checks the
+reply before the next stage sees it, and retries rate limits (429), server errors
+(5xx) and malformed replies with exponential backoff and jitter. `.env` is
+git-ignored, so the key never lands in the repo.
 
 Pick backends in the persona file, or override per run:
 
@@ -98,9 +119,12 @@ src/persona_pipeline/
 ├── pipeline.py          # orchestrator: ordering, timing, checkpoints, failure handling
 ├── config.py            # persona + pipeline settings (Pydantic)
 ├── models.py            # PostJob and the data passed between stages
+├── retry.py             # exponential backoff with jitter
+├── env.py               # tiny .env loader for API keys
 ├── backends/
 │   ├── base.py          # TextBackend, ImageBackend, VisionBackend interfaces
 │   ├── mock.py          # offline backends used by default and in tests
+│   ├── gemini.py        # Gemini text backend: structured JSON output + retries
 │   └── __init__.py      # registry: config name -> backend class
 └── stages/
     ├── prompt_writer.py
