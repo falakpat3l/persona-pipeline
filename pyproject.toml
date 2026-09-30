@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-pipeline"
-version = "0.2.0"
+version = "0.3.0"
 description = "A multi-stage AI orchestration pipeline that turns a topic into a ready-to-post image, caption and hashtags for a virtual persona."
 readme = "README.md"
 requires-python = ">=3.10"

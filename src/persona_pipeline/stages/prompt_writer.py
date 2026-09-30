@@ -42,19 +42,30 @@ def build_prompt(job: PostJob, ctx: StageContext, fix: str = "") -> str:
         f"Camera: {style.camera}",
         f"Avoid: {', '.join(style.avoid)}",
     ]
+    if fix and job.prompt is not None:
+        lines.append(f"Previous prompt: {job.prompt.positive}")
     if fix:
         lines.append(f"Fix: {fix}")
     return "\n".join(lines)
+
+
+def critic_feedback(job: PostJob) -> str:
+    """The critic's notes on the last image, if it did not pass. Empty otherwise."""
+    if job.critique is None or job.critique.passed:
+        return ""
+    return "; ".join(job.critique.notes) or "the image scored below the quality bar"
 
 
 class PromptWriter(Stage):
     name = "prompt_writer"
 
     def run(self, job: PostJob, ctx: StageContext) -> str:
-        data = ctx.text.complete_json("write_prompt", SYSTEM, build_prompt(job, ctx), SCHEMA)
+        fix = critic_feedback(job)
+        data = ctx.text.complete_json("write_prompt", SYSTEM, build_prompt(job, ctx, fix), SCHEMA)
         job.prompt = ImagePrompt(
             positive=data["positive"],
             negative=data.get("negative", ""),
             aspect_ratio=ASPECT_BY_FORMAT.get(job.brief.format, "4:5"),
         )
-        return f"{len(job.prompt.positive)} chars via {ctx.text.name}"
+        mode = "revised with critic notes" if fix else "new"
+        return f"{mode}, {len(job.prompt.positive)} chars via {ctx.text.name}"

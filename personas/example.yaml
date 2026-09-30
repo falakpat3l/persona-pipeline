@@ -35,9 +35,10 @@ pipeline:
   backends:
     text: mock     # set to "gemini" once GEMINI_API_KEY is in .env
     image: mock
-    vision: mock
+    vision: mock   # set to "gemini" to have Gemini judge each image
   gemini:
     text_model: gemini-3.8-flash
+    vision_model: gemini-3.8-flash
     fallback_models: [gemini-3.5-flash, gemini-3.5-flash-lite]
     temperature: 0.9
     max_retries: 3

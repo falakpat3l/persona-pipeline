@@ -5,6 +5,9 @@ Design notes
 - After every stage the manifest is rewritten, so a crash leaves a readable trace
   of exactly how far the run got.
 - A failed stage stops the run and is recorded, rather than raising into the CLI.
+- Generation is a feedback loop: a vision critic scores each image, and a weak
+  image sends the critic's notes back to the prompt writer for another try. The
+  best-scoring attempt is kept, even if none reached the threshold.
 """
 
 from __future__ import annotations
@@ -13,12 +16,13 @@ import logging
 import re
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 from persona_pipeline import backends
 from persona_pipeline.config import Config
-from persona_pipeline.models import Brief, PostJob, StageEvent, StageStatus, utcnow
+from persona_pipeline.models import Attempt, Brief, PostJob, StageEvent, StageStatus, utcnow
 from persona_pipeline.stages import (
     CaptionWriter,
     Critic,
@@ -31,13 +35,28 @@ from persona_pipeline.stages import (
 
 log = logging.getLogger("persona_pipeline")
 
-DEFAULT_STAGES: tuple[type[Stage], ...] = (
-    PromptWriter,
-    ImageGenerator,
-    Critic,
-    CaptionWriter,
-    Packager,
-)
+
+@dataclass
+class ReviewLoop:
+    """Composite step: generate, critique, and revise until the critic is happy.
+
+    Runs `generate` then `review`. If the critique does not pass and attempts
+    remain, runs `revise` (which reads the critic's notes) and tries again.
+    `max_attempts=None` means "use the pipeline setting".
+    """
+
+    generate: Stage = field(default_factory=ImageGenerator)
+    review: Stage = field(default_factory=Critic)
+    revise: Stage = field(default_factory=PromptWriter)
+    max_attempts: int | None = None
+    name: str = "review_loop"
+
+
+Step = Stage | ReviewLoop
+
+
+def default_steps() -> list[Step]:
+    return [PromptWriter(), ReviewLoop(), CaptionWriter(), Packager()]
 
 
 def slugify(text: str, max_len: int = 40) -> str:
@@ -51,7 +70,7 @@ def make_job_id(topic: str, now: datetime | None = None) -> str:
 
 
 class Pipeline:
-    def __init__(self, config: Config, stages: Sequence[Stage] | None = None):
+    def __init__(self, config: Config, stages: Sequence[Step] | None = None):
         self.config = config
         settings = config.pipeline
         choice = settings.backends
@@ -61,24 +80,72 @@ class Pipeline:
             image=backends.create("image", choice.image, settings),
             vision=backends.create("vision", choice.vision, settings),
         )
-        self.stages: list[Stage] = list(stages) if stages else [cls() for cls in DEFAULT_STAGES]
+        self.stages: list[Step] = list(stages) if stages else default_steps()
 
     def new_job(self, brief: Brief, output_root: Path | None = None) -> PostJob:
+        root = Path(output_root or self.config.pipeline.output_dir)
         job_id = make_job_id(brief.topic)
-        root = output_root or self.config.pipeline.output_dir
-        out = Path(root) / job_id
-        out.mkdir(parents=True, exist_ok=True)
+        # Two runs of the same topic in the same second must not share a folder.
+        base, n = job_id, 2
+        while (root / job_id).exists():
+            job_id, n = f"{base}-{n}", n + 1
+        out = root / job_id
+        out.mkdir(parents=True)
         return PostJob(job_id=job_id, persona=self.config.persona.name, brief=brief, output_dir=out)
 
     def run(self, brief: Brief, output_root: Path | None = None) -> PostJob:
         job = self.new_job(brief, output_root)
         log.info("job %s started: %s", job.job_id, brief.topic)
-        for stage in self.stages:
-            if not self._run_stage(stage, job):
+        for step in self.stages:
+            ok = (
+                self._run_review_loop(step, job)
+                if isinstance(step, ReviewLoop)
+                else self._run_stage(step, job)
+            )
+            if not ok:
                 break
         self.save_manifest(job)
         log.info("job %s %s", job.job_id, "done" if job.succeeded else "failed")
         return job
+
+    def _run_review_loop(self, loop: ReviewLoop, job: PostJob) -> bool:
+        limit = loop.max_attempts or self.config.pipeline.max_attempts
+        started = utcnow()
+        t0 = time.perf_counter()
+
+        for number in range(1, limit + 1):
+            if number > 1 and not self._run_stage(loop.revise, job):
+                return False
+            if not self._run_stage(loop.generate, job):
+                return False
+            if not self._run_stage(loop.review, job):
+                return False
+            job.attempts.append(
+                Attempt(number=number, prompt=job.prompt, image=job.image, critique=job.critique)
+            )
+            if job.critique.passed:
+                break
+
+        best = max(job.attempts, key=lambda a: a.critique.score)
+        job.prompt, job.image, job.critique = best.prompt, best.image, best.critique
+        verdict = "passed" if best.critique.passed else "none passed, kept the best"
+        detail = (
+            f"best {best.critique.score:.1f} from attempt {best.number} "
+            f"of {len(job.attempts)} ({verdict})"
+        )
+        duration = (time.perf_counter() - t0) * 1000
+        job.events.append(
+            StageEvent(
+                stage=loop.name,
+                status=StageStatus.OK,
+                started_at=started,
+                duration_ms=round(duration, 2),
+                detail=detail,
+            )
+        )
+        log.info("  %-16s %-6s %7.1f ms  %s", loop.name, "ok", duration, detail)
+        self.save_manifest(job)
+        return True
 
     def _run_stage(self, stage: Stage, job: PostJob) -> bool:
         started = utcnow()

@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from persona_pipeline.backends.base import BackendError
@@ -107,12 +109,18 @@ class _GeminiBase:
         return self._client
 
     def _generate_json(
-        self, task: str, model: str, contents: Any, system: str, schema: dict[str, Any]
+        self,
+        task: str,
+        model: str,
+        contents: Any,
+        system: str,
+        schema: dict[str, Any],
+        temperature: float | None = None,
     ) -> dict:
         """Call `model`, and if it stays overloaded after retries, fall back down the list."""
         config = {
             "system_instruction": system,
-            "temperature": self.settings.temperature,
+            "temperature": self.settings.temperature if temperature is None else temperature,
             "response_mime_type": "application/json",
             "response_json_schema": schema,
             # We never pass tools, so switch off automatic function calling (and its log noise).
@@ -157,3 +165,32 @@ class GeminiText(_GeminiBase):
 
     def complete_json(self, task: str, system: str, prompt: str, schema: dict[str, Any]) -> dict:
         return self._generate_json(task, self.settings.text_model, prompt, system, schema)
+
+
+MAX_IMAGE_BYTES = 15 * 1024 * 1024  # inline images must stay well under the request limit
+
+
+def image_part(path: Path) -> dict:
+    """An inline image part for a Gemini request, read from disk."""
+    data = Path(path).read_bytes()
+    if len(data) > MAX_IMAGE_BYTES:
+        raise BackendError(f"{path} is {len(data) // 1_000_000} MB, too large to send inline")
+    mime = mimetypes.guess_type(str(path))[0] or "image/png"
+    return {"inline_data": {"mime_type": mime, "data": data}}
+
+
+class GeminiVision(_GeminiBase):
+    """Vision role: looks at a generated image and scores it against a rubric."""
+
+    def inspect_json(
+        self, task: str, image_path: Path, instruction: str, schema: dict[str, Any]
+    ) -> dict:
+        system = (
+            "You are a strict but fair art director reviewing images for a social media "
+            "account. Judge only what you can see. Reply only with JSON."
+        )
+        contents = [image_part(image_path), instruction]
+        # Low temperature: a judge should give the same score to the same image.
+        return self._generate_json(
+            task, self.settings.vision_model, contents, system, schema, temperature=0.2
+        )

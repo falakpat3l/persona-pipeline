@@ -50,6 +50,15 @@ class Critique(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class Attempt(BaseModel):
+    """One pass through generate + review. Every attempt is kept for the trace."""
+
+    number: int
+    prompt: ImagePrompt
+    image: GeneratedImage
+    critique: Critique
+
+
 class Caption(BaseModel):
     text: str
     hashtags: list[str] = Field(default_factory=list)
@@ -86,6 +95,7 @@ class PostJob(BaseModel):
     image: GeneratedImage | None = None
     critique: Critique | None = None
     caption: Caption | None = None
+    attempts: list[Attempt] = Field(default_factory=list)
     output_dir: Path | None = None
     events: list[StageEvent] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utcnow)

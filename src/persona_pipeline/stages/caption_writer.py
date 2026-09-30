@@ -20,6 +20,23 @@ def _clean_tag(tag: str) -> str:
     return "".join(ch for ch in tag.lstrip("#") if ch.isalnum() or ch == "_").lower()
 
 
+def _unique(tags) -> list[str]:
+    out: list[str] = []
+    for tag in tags:
+        if tag and tag not in out:
+            out.append(tag)
+    return out
+
+
+def _trim(text: str, limit: int) -> str:
+    """Cut to `limit` characters without breaking a word."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return cut + "…"
+
+
 class CaptionWriter(Stage):
     name = "caption_writer"
 
@@ -46,16 +63,16 @@ class CaptionWriter(Stage):
         )
         data = ctx.text.complete_json("write_caption", system, prompt, SCHEMA)
 
-        # Merge model tags with the persona's base tags, dedupe, keep order, cap count.
-        tags: list[str] = []
-        for tag in [*data.get("hashtags", []), *voice.base_hashtags]:
-            clean = _clean_tag(tag)
-            if clean and clean not in tags:
-                tags.append(clean)
+        # The persona's base tags always make it in; model tags fill the remaining slots.
+        base = _unique(_clean_tag(t) for t in voice.base_hashtags)[: voice.max_hashtags]
+        extra = [
+            t for t in _unique(_clean_tag(t) for t in data.get("hashtags", [])) if t not in base
+        ]
+        tags = extra[: voice.max_hashtags - len(base)] + base
 
         job.caption = Caption(
-            text=data["text"][: voice.max_caption_chars],
-            hashtags=tags[: voice.max_hashtags],
+            text=_trim(data["text"], voice.max_caption_chars),
+            hashtags=tags,
             alt_text=data.get("alt_text", ""),
         )
         return f"{len(job.caption.text)} chars, {len(job.caption.hashtags)} hashtags"

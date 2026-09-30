@@ -34,7 +34,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     print(f"Job:     {job.job_id}")
     print(f"Status:  {'OK' if job.succeeded else 'FAILED'}")
     if job.critique:
-        print(f"Score:   {job.critique.score:.1f}")
+        print(f"Score:   {job.critique.score:.1f} (best of {len(job.attempts)} attempts)")
     print(f"Output:  {job.output_dir}")
     if job.caption:
         print()

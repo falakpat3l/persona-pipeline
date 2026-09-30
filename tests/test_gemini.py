@@ -224,3 +224,32 @@ def test_full_pipeline_with_gemini_text(config, tmp_path):
     assert "digitalcreator" in job.caption.hashtags
     # the prompt writer sent the persona's signature to the model
     assert "layered gold jewellery" in client.calls[0]["contents"]
+
+
+# GeminiVision
+
+
+def test_vision_sends_the_image_bytes_and_rubric(tmp_path):
+    from persona_pipeline.backends.gemini import GeminiVision
+
+    img = tmp_path / "post.png"
+    img.write_bytes(b"\x89PNG fake")
+    settings = PipelineSettings()
+    settings.gemini.fallback_models = []
+    settings.gemini.vision_model = "vision-model"
+    client = FakeClient(['{"score": 8, "notes": ["good"]}'])
+    vision = GeminiVision(settings, client=client)
+
+    out = vision.inspect_json("critique", img, "Score this image", {"required": ["score"]})
+
+    assert out["score"] == 8
+    call = client.calls[0]
+    assert call["model"] == "vision-model"
+    image, rubric = call["contents"]
+    assert image["inline_data"] == {"mime_type": "image/png", "data": b"\x89PNG fake"}
+    assert rubric == "Score this image"
+    assert call["config"]["temperature"] == 0.2
+
+
+def test_vision_registered():
+    assert "gemini" in backends.available("vision")

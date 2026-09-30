@@ -21,13 +21,9 @@ def test_full_mock_run_produces_post_folder(config, tmp_path):
     job = Pipeline(config).run(Brief(topic="Focus tips for students"), output_root=tmp_path)
 
     assert job.succeeded
-    assert [e.stage for e in job.events] == [
-        "prompt_writer",
-        "image_generator",
-        "critic",
-        "caption_writer",
-        "packager",
-    ]
+    stages = [e.stage for e in job.events]
+    assert stages[:3] == ["prompt_writer", "image_generator", "critic"]
+    assert stages[-3:] == ["review_loop", "caption_writer", "packager"]
     out = job.output_dir
     for name in ("post.png", "caption.txt", "alt_text.txt", "manifest.json"):
         assert (out / name).exists(), name
@@ -61,6 +57,17 @@ def test_hashtags_are_clean_deduped_and_capped(config, tmp_path):
     assert all(t.isalnum() or "_" in t for t in tags)
 
 
+def test_base_hashtags_are_never_crowded_out(config, tmp_path):
+    """Regression: a model that returns many tags used to push the persona's own tags out."""
+    config.persona.voice.max_hashtags = 4
+    config.persona.voice.base_hashtags = ["brandtag", "second"]
+    job = Pipeline(config).run(
+        Brief(topic="alpha bravo charlie delta echo foxtrot"), output_root=tmp_path
+    )
+    assert len(job.caption.hashtags) == 4
+    assert job.caption.hashtags[-2:] == ["brandtag", "second"]
+
+
 def test_failing_stage_stops_run_and_is_recorded(config, tmp_path):
     class Boom(Stage):
         name = "boom"
@@ -85,6 +92,13 @@ def test_failing_stage_stops_run_and_is_recorded(config, tmp_path):
 def test_unknown_backend_gives_helpful_error():
     with pytest.raises(BackendError, match="Available: mock"):
         backends.create("image", "does-not-exist")
+
+
+def test_same_topic_twice_in_one_second_gets_separate_folders(config, tmp_path):
+    pipeline = Pipeline(config)
+    a = pipeline.new_job(Brief(topic="Same"), output_root=tmp_path)
+    b = pipeline.new_job(Brief(topic="Same"), output_root=tmp_path)
+    assert a.output_dir != b.output_dir
 
 
 def test_slug_and_job_id():
