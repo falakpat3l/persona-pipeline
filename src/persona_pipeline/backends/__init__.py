@@ -20,7 +20,11 @@ _REGISTRY: dict[str, dict[str, str]] = {
         "mock": "persona_pipeline.backends.mock:MockText",
         "gemini": "persona_pipeline.backends.gemini:GeminiText",
     },
-    "image": {"mock": "persona_pipeline.backends.mock:MockImage"},
+    "image": {
+        "mock": "persona_pipeline.backends.mock:MockImage",
+        "drawthings": "persona_pipeline.backends.drawthings:DrawThingsImage",
+        "gemini": "persona_pipeline.backends.gemini:GeminiImage",
+    },
     "vision": {
         "mock": "persona_pipeline.backends.mock:MockVision",
         "gemini": "persona_pipeline.backends.gemini:GeminiVision",

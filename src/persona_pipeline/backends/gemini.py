@@ -19,8 +19,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
 from persona_pipeline.backends.base import BackendError
 from persona_pipeline.config import PipelineSettings
+from persona_pipeline.models import GeneratedImage, ImagePrompt
 from persona_pipeline.retry import with_retries
 
 log = logging.getLogger("persona_pipeline")
@@ -194,3 +197,47 @@ class GeminiVision(_GeminiBase):
         return self._generate_json(
             task, self.settings.vision_model, contents, system, schema, temperature=0.2
         )
+
+
+class GeminiImage(_GeminiBase):
+    """Image role via Gemini's image model. Note: this model has no free tier."""
+
+    ASPECTS = {"1:1", "4:5", "9:16"}
+
+    def generate(self, prompt: ImagePrompt, out_path: Path) -> GeneratedImage:
+        text = prompt.positive
+        if prompt.negative:
+            text += f"\nDo not include: {prompt.negative}"
+        config = {
+            "response_modalities": ["IMAGE"],
+            "image_config": {
+                "aspect_ratio": prompt.aspect_ratio
+                if prompt.aspect_ratio in self.ASPECTS
+                else "4:5"
+            },
+        }
+        model = self.settings.image_model
+
+        def call() -> bytes:
+            response = self.client.models.generate_content(
+                model=model, contents=text, config=config
+            )
+            for candidate in getattr(response, "candidates", None) or []:
+                content = getattr(candidate, "content", None)
+                for part in getattr(content, "parts", None) or []:
+                    inline = getattr(part, "inline_data", None)
+                    if inline is not None and getattr(inline, "data", None):
+                        return inline.data
+            raise MalformedOutput("the image model returned no image (it may have been filtered)")
+
+        data = with_retries(
+            call,
+            attempts=self.settings.max_retries,
+            is_retryable=is_retryable,
+            label=f"gemini:image:{model}",
+        )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(data)
+        with Image.open(out_path) as img:
+            width, height = img.size
+        return GeneratedImage(path=out_path, width=width, height=height, backend=self.name)

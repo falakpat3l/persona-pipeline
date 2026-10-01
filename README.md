@@ -89,11 +89,11 @@ outputs/20260930-122615-desk-reset/
 
 ## Backends
 
-| Role   | Available now    | Planned                        |
-| ------ | ---------------- | ------------------------------ |
-| text   | `mock`, `gemini` |                                |
-| image  | `mock`           | `drawthings` (local), `gemini` |
-| vision | `mock`, `gemini` |                                |
+| Role   | Available                                          |
+| ------ | -------------------------------------------------- |
+| text   | `mock`, `gemini`                                   |
+| image  | `mock`, `drawthings` (local, free), `gemini` (paid) |
+| vision | `mock`, `gemini`                                   |
 
 ### Using Gemini
 
@@ -118,11 +118,31 @@ main model stays overloaded, it falls back to lighter models (`fallback_models` 
 the persona file), so a busy day at Google does not stop the run. `.env` is
 git-ignored, so the key never lands in the repo.
 
+### Using Draw Things (free, local images on a Mac)
+
+1. Install [Draw Things](https://drawthings.ai) and download a model inside the app
+   (FLUX.1 Schnell is fast; SDXL models are a good all-rounder).
+2. In Draw Things, open **Settings**, find **API Server**, and turn it on
+   (it listens on `http://127.0.0.1:7860`).
+3. Set `image: drawthings` in the persona file, then check everything is ready:
+
+   ```bash
+   persona-pipeline doctor --persona personas/example.yaml
+   ```
+
+Image size, steps, model and timeout live under `drawthings:` in the persona file.
+`size_scale: 0.75` makes images smaller and faster on lighter Macs. Sizes are
+always multiples of 64, which diffusion models need.
+
+Gemini can also generate images (`image: gemini`), but its image model has no
+free tier, so Draw Things is the default choice.
+
 Pick backends in the persona file, or override per run:
 
 ```bash
 persona-pipeline run --persona personas/example.yaml --topic "..." --image mock
 persona-pipeline backends   # list what is installed
+persona-pipeline doctor --persona personas/example.yaml   # check keys and apps
 ```
 
 ## Project layout
@@ -137,7 +157,8 @@ src/persona_pipeline/
 ├── backends/
 │   ├── base.py          # TextBackend, ImageBackend, VisionBackend interfaces
 │   ├── mock.py          # offline backends used by default and in tests
-│   ├── gemini.py        # Gemini text + vision: structured JSON, retries, model fallback
+│   ├── gemini.py        # Gemini text, vision and image: structured JSON, retries, fallback
+│   ├── drawthings.py    # local Draw Things app over its HTTP API (standard library only)
 │   └── __init__.py      # registry: config name -> backend class
 └── stages/
     ├── prompt_writer.py

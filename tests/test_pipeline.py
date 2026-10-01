@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -90,7 +91,7 @@ def test_failing_stage_stops_run_and_is_recorded(config, tmp_path):
 
 
 def test_unknown_backend_gives_helpful_error():
-    with pytest.raises(BackendError, match="Available: mock"):
+    with pytest.raises(BackendError, match="Available: .*mock"):
         backends.create("image", "does-not-exist")
 
 
@@ -121,3 +122,23 @@ def test_cli_run(tmp_path, capsys):
     )
     assert code == 0
     assert "Status:  OK" in capsys.readouterr().out
+
+
+def test_doctor_all_mock_is_fine(capsys):
+    assert main(["doctor", "--persona", "personas/example.yaml"]) == 0
+    assert "All good." in capsys.readouterr().out
+
+
+def test_doctor_flags_missing_key_and_app(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("DRAWTHINGS_URL", "http://127.0.0.1:9")
+    text = Path("personas/example.yaml").read_text()
+    text = text.replace("text: mock", "text: gemini").replace("image: mock", "image: drawthings")
+    persona = tmp_path / "p.yaml"
+    persona.write_text(text)
+    monkeypatch.chdir(tmp_path)  # no .env here
+    assert main(["doctor", "--persona", str(persona)]) == 1
+    out = capsys.readouterr().out
+    assert "GEMINI_API_KEY" in out
+    assert "API Server" in out

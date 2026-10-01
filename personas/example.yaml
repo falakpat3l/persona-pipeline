@@ -34,7 +34,7 @@ persona:
 pipeline:
   backends:
     text: mock     # set to "gemini" once GEMINI_API_KEY is in .env
-    image: mock
+    image: mock    # set to "drawthings" for real images from the Draw Things app
     vision: mock   # set to "gemini" to have Gemini judge each image
   gemini:
     text_model: gemini-3.8-flash
@@ -42,6 +42,12 @@ pipeline:
     fallback_models: [gemini-3.5-flash, gemini-3.5-flash-lite]
     temperature: 0.9
     max_retries: 3
+  drawthings:
+    url: http://127.0.0.1:7860
+    steps: 20          # FLUX.1 Schnell only needs about 4
+    cfg_scale: 7.0
+    size_scale: 1.0    # 0.75 = smaller, faster images
+    timeout_s: 300
   output_dir: outputs
   critic_threshold: 7.0
   max_attempts: 3

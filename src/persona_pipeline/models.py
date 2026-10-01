@@ -40,6 +40,7 @@ class GeneratedImage(BaseModel):
     height: int
     backend: str
     attempt: int = 1
+    seed: int | None = None
 
 
 class Critique(BaseModel):

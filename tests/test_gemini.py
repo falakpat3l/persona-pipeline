@@ -253,3 +253,64 @@ def test_vision_sends_the_image_bytes_and_rubric(tmp_path):
 
 def test_vision_registered():
     assert "gemini" in backends.available("vision")
+
+
+# GeminiImage
+
+
+def _image_reply(data):
+    part = SimpleNamespace(inline_data=SimpleNamespace(data=data, mime_type="image/png"))
+    return SimpleNamespace(candidates=[SimpleNamespace(content=SimpleNamespace(parts=[part]))])
+
+
+class ImageClient(FakeClient):
+    def generate_content(self, *, model, contents, config):
+        self.calls.append({"model": model, "contents": contents, "config": config})
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
+def test_gemini_image_saves_the_returned_picture(tmp_path):
+    import io
+
+    from PIL import Image
+
+    from persona_pipeline.backends.gemini import GeminiImage
+    from persona_pipeline.models import ImagePrompt
+
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 50), "navy").save(buf, format="PNG")
+    settings = PipelineSettings()
+    settings.gemini.image_model = "img-model"
+    client = ImageClient([_image_reply(buf.getvalue())])
+    backend = GeminiImage(settings, client=client)
+
+    image = backend.generate(
+        ImagePrompt(positive="a desk", negative="text", aspect_ratio="9:16"), tmp_path / "i.png"
+    )
+
+    assert (image.width, image.height) == (40, 50)
+    call = client.calls[0]
+    assert call["model"] == "img-model"
+    assert "Do not include: text" in call["contents"]
+    assert call["config"]["image_config"] == {"aspect_ratio": "9:16"}
+    assert call["config"]["response_modalities"] == ["IMAGE"]
+
+
+def test_gemini_image_retries_when_no_image_comes_back(tmp_path):
+    import io
+
+    from PIL import Image
+
+    from persona_pipeline.backends.gemini import GeminiImage
+    from persona_pipeline.models import ImagePrompt
+
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(buf, format="PNG")
+    empty = SimpleNamespace(candidates=[])
+    client = ImageClient([empty, _image_reply(buf.getvalue())])
+    backend = GeminiImage(PipelineSettings(), client=client)
+    backend.generate(ImagePrompt(positive="x"), tmp_path / "i.png")
+    assert len(client.calls) == 2

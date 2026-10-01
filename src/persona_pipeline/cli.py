@@ -48,6 +48,49 @@ def _cmd_backends(_: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    """Check that every backend the persona file asks for is ready to use."""
+    import os
+    import urllib.request
+
+    config = load_config(args.persona)
+    choice = config.pipeline.backends
+    problems = 0
+
+    def report(ok: bool, what: str, hint: str = "") -> None:
+        nonlocal problems
+        problems += not ok
+        print(f"  [{'ok' if ok else '!!'}] {what}" + ("" if ok else f"\n       {hint}"))
+
+    print(
+        f"Persona: {config.persona.name}  (text={choice.text}, image={choice.image}, "
+        f"vision={choice.vision})"
+    )
+    if "gemini" in (choice.text, choice.image, choice.vision):
+        has_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+        report(has_key, "Gemini API key found", "Add GEMINI_API_KEY=... to .env in this folder.")
+        try:
+            import google.genai  # noqa: F401
+
+            report(True, "Gemini library installed")
+        except ImportError:
+            report(False, "Gemini library installed", 'Run: pip install -e ".[gemini]"')
+    if choice.image == "drawthings":
+        url = (os.environ.get("DRAWTHINGS_URL") or config.pipeline.drawthings.url).rstrip("/")
+        try:
+            with urllib.request.urlopen(f"{url}/sdapi/v1/options", timeout=5):
+                pass
+            report(True, f"Draw Things answering at {url}")
+        except Exception:
+            report(
+                False,
+                f"Draw Things answering at {url}",
+                "Open Draw Things, then Settings > API Server > turn it on.",
+            )
+    print("All good." if not problems else f"{problems} thing(s) to fix.")
+    return 0 if not problems else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="persona-pipeline", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -64,6 +107,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--image", help="override image backend")
     run.add_argument("--vision", help="override vision backend")
     run.set_defaults(func=_cmd_run)
+
+    doc = sub.add_parser("doctor", help="check keys and apps needed by a persona file")
+    doc.add_argument("--persona", required=True, help="path to a persona YAML file")
+    doc.set_defaults(func=_cmd_doctor)
 
     lst = sub.add_parser("backends", help="list available backends")
     lst.set_defaults(func=_cmd_backends)
