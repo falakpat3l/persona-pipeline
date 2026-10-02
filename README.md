@@ -1,7 +1,7 @@
 # persona-pipeline
 
 [![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-1.0.0-7aa2f7)
+![version](https://img.shields.io/badge/version-1.0.1-7aa2f7)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![status](https://img.shields.io/badge/status-complete-2ea44f)
 
@@ -200,7 +200,7 @@ pytest
 ruff check .
 ```
 
-63 tests cover the orchestrator, the critic loop, every backend and the CLI.
+67 tests cover the orchestrator, the critic loop, every backend and the CLI.
 Real services are replaced by fakes (a fake Gemini client and a tiny local HTTP
 server that behaves like Draw Things), so the suite runs offline in a few seconds
 and on every push through GitHub Actions.

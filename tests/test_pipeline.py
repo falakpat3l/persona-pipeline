@@ -142,3 +142,15 @@ def test_doctor_flags_missing_key_and_app(tmp_path, capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "GEMINI_API_KEY" in out
     assert "API Server" in out
+
+
+def test_cli_friendly_error_for_missing_persona(capsys):
+    assert main(["run", "--persona", "nope.yaml", "--topic", "x"]) == 2
+    assert "file not found: nope.yaml" in capsys.readouterr().err
+
+
+def test_cli_friendly_error_for_invalid_persona(tmp_path, capsys):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text("persona:\n  name: Only a name\n")  # style is missing
+    assert main(["doctor", "--persona", str(bad)]) == 2
+    assert "not valid" in capsys.readouterr().err

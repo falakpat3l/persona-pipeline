@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-pipeline"
-version = "1.0.0"
+version = "1.0.1"
 description = "A multi-stage AI orchestration pipeline that turns a topic into a ready-to-post image, caption and hashtags for a virtual persona."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,11 +20,11 @@ classifiers = [
 dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6.0",
-    "pillow>=10.0",
+    "pillow>=10.1",  # 10.1 added ImageFont.load_default(size=...)
 ]
 
 [project.optional-dependencies]
-gemini = ["google-genai>=1.30"]
+gemini = ["google-genai>=1.40"]  # 1.40 added image_config for image models
 dev = ["pytest>=8.0", "ruff>=0.5"]
 
 [project.urls]

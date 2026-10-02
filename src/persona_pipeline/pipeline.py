@@ -114,12 +114,18 @@ class Pipeline:
         t0 = time.perf_counter()
 
         for number in range(1, limit + 1):
-            if number > 1 and not self._run_stage(loop.revise, job):
-                return False
-            if not self._run_stage(loop.generate, job):
-                return False
-            if not self._run_stage(loop.review, job):
-                return False
+            steps = [loop.generate, loop.review]
+            if number > 1:
+                steps.insert(0, loop.revise)
+            if not all(self._run_stage(step, job) for step in steps):
+                if not job.attempts:
+                    return False  # nothing usable yet: the run fails
+                # A retry failed (for example the API went down): keep the best attempt so far.
+                failed = job.events[-1]
+                failed.status = StageStatus.SKIPPED
+                failed.detail += " (retry abandoned, kept the earlier attempt)"
+                log.warning("  retry %d failed, keeping the best earlier attempt", number)
+                break
             job.attempts.append(
                 Attempt(number=number, prompt=job.prompt, image=job.image, critique=job.critique)
             )

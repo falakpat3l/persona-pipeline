@@ -295,7 +295,9 @@ def test_gemini_image_saves_the_returned_picture(tmp_path):
     call = client.calls[0]
     assert call["model"] == "img-model"
     assert "Do not include: text" in call["contents"]
-    assert call["config"]["image_config"] == {"aspect_ratio": "9:16"}
+    image_config = call["config"]["image_config"]
+    aspect = getattr(image_config, "aspect_ratio", None) or image_config["aspect_ratio"]
+    assert aspect == "9:16"
     assert call["config"]["response_modalities"] == ["IMAGE"]
 
 

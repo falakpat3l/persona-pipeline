@@ -24,6 +24,16 @@ def test_load_dotenv(tmp_path, monkeypatch):
     assert found["PP_KEEP"] == "changed"
 
 
+def test_load_dotenv_inline_comments(tmp_path, monkeypatch):
+    monkeypatch.delenv("PP_C", raising=False)
+    monkeypatch.delenv("PP_D", raising=False)
+    env = tmp_path / ".env"
+    env.write_text('PP_C=abc123  # my key\nPP_D="has # inside"\n')
+    load_dotenv(env)
+    assert os.environ["PP_C"] == "abc123"
+    assert os.environ["PP_D"] == "has # inside"
+
+
 def test_load_dotenv_missing_file(tmp_path):
     assert load_dotenv(tmp_path / "nope.env") == {}
 

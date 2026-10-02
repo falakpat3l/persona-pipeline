@@ -69,6 +69,25 @@ def test_first_image_passing_means_one_attempt(config, tmp_path):
     assert [e.stage for e in job.events].count("prompt_writer") == 1
 
 
+def test_failed_retry_keeps_the_earlier_attempt(config, tmp_path):
+    """Regression: an API error on attempt 2 used to fail the whole run."""
+
+    class DownWriter(PromptWriter):
+        def run(self, job, ctx):
+            raise RuntimeError("503 overloaded")  # the API goes down after attempt 1
+
+    loop = ReviewLoop(review=ScriptedCritic([5.0, 9.0]), revise=DownWriter(), max_attempts=3)
+    steps = [PromptWriter(), loop, CaptionWriter(), Packager()]
+    job = Pipeline(config, stages=steps).run(Brief(topic="Flaky"), output_root=tmp_path)
+
+    assert job.succeeded
+    assert len(job.attempts) == 1
+    assert job.critique.score == 5.0
+    skipped = [e for e in job.events if e.status.value == "skipped"]
+    assert len(skipped) == 1 and "kept the earlier attempt" in skipped[0].detail
+    assert (job.output_dir / "post.png").exists()
+
+
 class FixedVision:
     name = "fixed"
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.1 (2026-10-02)
+
+Bug fixes found in a review:
+
+- Mock images crashed on Pillow 10.0; the minimum is now Pillow 10.1
+- Gemini image generation failed on google-genai older than 1.40; it now sends a
+  typed `ImageConfig` and requires google-genai 1.40 or newer
+- A failure on a retry (for example the API going down on attempt 2) failed the
+  whole run; the critic loop now keeps the best earlier attempt instead
+- `.env` values followed by an inline `# comment` included the comment
+- A missing or invalid persona file printed a long traceback; the CLI now shows a
+  short, readable error
+- The test suite now also runs on the oldest supported versions (Python 3.10)
+
 ## 1.0.0 (2026-10-02)
 
 First complete release.

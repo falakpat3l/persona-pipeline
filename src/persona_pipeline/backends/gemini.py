@@ -199,6 +199,15 @@ class GeminiVision(_GeminiBase):
         )
 
 
+def _image_config(aspect_ratio: str):
+    """A typed ImageConfig when the SDK is installed (older SDKs reject a plain dict)."""
+    try:
+        from google.genai import types
+    except ImportError:  # tests with a fake client, no SDK needed
+        return {"aspect_ratio": aspect_ratio}
+    return types.ImageConfig(aspect_ratio=aspect_ratio)
+
+
 class GeminiImage(_GeminiBase):
     """Image role via Gemini's image model. Note: this model has no free tier."""
 
@@ -210,11 +219,9 @@ class GeminiImage(_GeminiBase):
             text += f"\nDo not include: {prompt.negative}"
         config = {
             "response_modalities": ["IMAGE"],
-            "image_config": {
-                "aspect_ratio": prompt.aspect_ratio
-                if prompt.aspect_ratio in self.ASPECTS
-                else "4:5"
-            },
+            "image_config": _image_config(
+                prompt.aspect_ratio if prompt.aspect_ratio in self.ASPECTS else "4:5"
+            ),
         }
         model = self.settings.image_model
 

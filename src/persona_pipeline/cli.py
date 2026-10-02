@@ -11,6 +11,9 @@ import logging
 import sys
 from pathlib import Path
 
+import yaml
+from pydantic import ValidationError
+
 from persona_pipeline import __version__, backends
 from persona_pipeline.config import load_config
 from persona_pipeline.env import load_dotenv
@@ -128,7 +131,13 @@ def main(argv: list[str] | None = None) -> int:
         # Keep the output to our own stage log; SDK and HTTP chatter only with -v.
         for noisy in ("httpx", "httpcore", "google_genai", "google.genai"):
             logging.getLogger(noisy).setLevel(logging.WARNING)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except FileNotFoundError as exc:
+        print(f"Error: file not found: {exc.filename}", file=sys.stderr)
+    except (yaml.YAMLError, ValidationError) as exc:
+        print(f"Error: the persona file is not valid.\n{exc}", file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
