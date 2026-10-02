@@ -1,5 +1,10 @@
 # persona-pipeline
 
+[![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
+![version](https://img.shields.io/badge/version-1.0.0-7aa2f7)
+![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
+![status](https://img.shields.io/badge/status-complete-2ea44f)
+
 A multi-stage AI orchestration pipeline that turns a one-line topic into a
 ready-to-post image, caption, hashtags and alt text for a **virtual persona**,
 while keeping the persona's look and voice consistent across every post.
@@ -194,6 +199,33 @@ critic in the same feedback loop.
 pytest
 ruff check .
 ```
+
+63 tests cover the orchestrator, the critic loop, every backend and the CLI.
+Real services are replaced by fakes (a fake Gemini client and a tiny local HTTP
+server that behaves like Draw Things), so the suite runs offline in a few seconds
+and on every push through GitHub Actions.
+
+## Design decisions
+
+- **One shared job object.** Every stage reads and writes a single `PostJob`, so a
+  run is always one JSON file that can be inspected, diffed or resumed.
+- **Interfaces before vendors.** Stages only know `TextBackend`, `ImageBackend` and
+  `VisionBackend`. Swapping Gemini for another provider is one new file and one
+  registry line.
+- **Structured output everywhere.** Each model call carries a JSON schema and the
+  reply is validated before the next stage sees it; malformed replies are retried
+  rather than passed along.
+- **Fail loudly, but readably.** Known problems (missing key, app not running)
+  raise a `BackendError` with a fix-it hint; unexpected ones keep the traceback.
+  `persona-pipeline doctor` checks the setup before a run.
+- **Keep the best, not the last.** The critic loop stores every attempt and
+  packages the highest-scoring image, even if none reached the threshold.
+
+## Status
+
+**v1.0 is complete.** It covers the full loop: brief, prompt, image, critique,
+revision, caption and packaging, with Gemini and Draw Things backends.
+Ideas that were deliberately left out of v1.0 are listed in [ROADMAP.md](ROADMAP.md).
 
 ## License
 

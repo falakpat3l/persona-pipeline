@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-pipeline"
-version = "0.4.0"
+version = "1.0.0"
 description = "A multi-stage AI orchestration pipeline that turns a topic into a ready-to-post image, caption and hashtags for a virtual persona."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Falak Patel" }]
 keywords = ["ai", "orchestration", "pipeline", "image-generation", "llm", "gemini"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6.0",
@@ -20,6 +26,9 @@ dependencies = [
 [project.optional-dependencies]
 gemini = ["google-genai>=1.30"]
 dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.urls]
+Repository = "https://github.com/falakpat3l/persona-pipeline"
 
 [project.scripts]
 persona-pipeline = "persona_pipeline.cli:main"
