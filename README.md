@@ -1,7 +1,7 @@
 # persona-pipeline
 
 [![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-1.0.1-7aa2f7)
+![version](https://img.shields.io/badge/version-1.0.2-7aa2f7)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![status](https://img.shields.io/badge/status-complete-2ea44f)
 
@@ -28,6 +28,8 @@ The critic loop is the core of the orchestration: a vision model scores every
 image against the persona's rubric, and a weak image sends the critic's notes back
 to the prompt writer for a revised prompt. The loop stops at the first image that
 passes, and if none does, the best-scoring attempt is kept.
+
+**New to the code?** Start with [GUIDE.md](GUIDE.md), a plain-English tour of how it works and where to make changes.
 
 ## Why this exists
 

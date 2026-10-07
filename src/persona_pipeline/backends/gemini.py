@@ -4,9 +4,16 @@ Setup:
     pip install -e ".[gemini]"
     echo "GEMINI_API_KEY=your-key" > .env      # free key: https://aistudio.google.com/apikey
 
-Every call asks Gemini for JSON that matches the stage's schema (structured
-output), checks the required keys, and retries rate limits, server errors and
-malformed replies with exponential backoff.
+How this file works, top to bottom:
+  1. api_key_from_env()  finds your key in .env.
+  2. parse_json_reply()  turns Gemini's reply into a dict and checks it has every field we need.
+  3. is_retryable()      decides which errors are worth trying again ("busy", "timed out").
+  4. _GeminiBase         shared by the three classes below. Its _generate_json() does
+                         the actual call: try the main model a few times, and if it
+                         stays busy, move on to the next model in fallback_models.
+  5. GeminiText          writes prompts and captions.
+     GeminiVision        looks at an image and scores it.
+     GeminiImage         draws an image (paid model, no free tier).
 """
 
 from __future__ import annotations
@@ -29,6 +36,9 @@ from persona_pipeline.retry import with_retries
 log = logging.getLogger("persona_pipeline")
 
 API_KEY_VARS = ("GEMINI_API_KEY", "GOOGLE_API_KEY")
+# HTTP status codes that mean "try again later": timeout, too many requests,
+# and server-side errors. Anything else (like 400 bad request) is our mistake,
+# so retrying would only fail again.
 RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
 
 
@@ -87,6 +97,8 @@ def is_retryable(exc: Exception) -> bool:
 
 
 class _GeminiBase:
+    """Shared setup for the three Gemini classes: settings, the client, and the call."""
+
     name = "gemini"
 
     def __init__(self, settings: PipelineSettings | None = None, client: Any = None):
@@ -120,7 +132,12 @@ class _GeminiBase:
         schema: dict[str, Any],
         temperature: float | None = None,
     ) -> dict:
-        """Call `model`, and if it stays overloaded after retries, fall back down the list."""
+        """Ask Gemini for JSON. Try `model` first; if it stays busy, try the fallbacks.
+
+        Example with fallback_models [B, C]: try A up to max_retries times. Still
+        busy? Try B the same way, then C. Once B has worked, later calls in the
+        same run start at B instead of waiting on A again ("sticky" fallback).
+        """
         config = {
             "system_instruction": system,
             "temperature": self.settings.temperature if temperature is None else temperature,
@@ -136,7 +153,7 @@ class _GeminiBase:
             chain = chain[chain.index(self._sticky_model) :]
 
         for i, current in enumerate(chain):
-
+            # One attempt against one model. with_retries() repeats it on busy errors.
             def call(current: str = current) -> dict:
                 response = self.client.models.generate_content(
                     model=current, contents=contents, config=config
@@ -225,6 +242,7 @@ class GeminiImage(_GeminiBase):
         }
         model = self.settings.image_model
 
+        # One attempt: ask for the image, then dig the picture's bytes out of the reply.
         def call() -> bytes:
             response = self.client.models.generate_content(
                 model=model, contents=text, config=config

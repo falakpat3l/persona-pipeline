@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 (2026-10-07)
+
+Easier to read and work on. No change in behaviour.
+
+- New `GUIDE.md`: a plain-English tour of how the code works and where to make changes
+- Plainer comments in the Gemini backend (`backends/gemini.py`)
+
 ## 1.0.1 (2026-10-02)
 
 Bug fixes found in a review:
