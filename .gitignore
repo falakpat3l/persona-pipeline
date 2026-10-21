@@ -184,3 +184,6 @@ outputs/
 
 # macOS
 .DS_Store
+
+# Local scratch output from AI assistants
+Claude outputs/

@@ -149,3 +149,14 @@ def test_full_pipeline_with_drawthings(fake_app, config, tmp_path, monkeypatch):
     assert job.image.backend == "drawthings"
     with Image.open(job.output_dir / "post.png") as img:
         assert img.size == (896, 1152)
+
+
+def test_reply_that_is_not_json_gives_a_hint(tmp_path, monkeypatch):
+    monkeypatch.delenv("DRAWTHINGS_URL", raising=False)
+
+    def not_json(url, body, timeout):
+        return json.loads("<html>not the app</html>")
+
+    backend = DrawThingsImage(PipelineSettings(), post=not_json)
+    with pytest.raises(BackendError, match="not like Draw Things"):
+        backend.generate(ImagePrompt(positive="x"), tmp_path / "img.png")

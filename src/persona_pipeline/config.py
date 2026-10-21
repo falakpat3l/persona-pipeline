@@ -25,14 +25,14 @@ class Voice(BaseModel):
 
     tone: str = "warm, curious, concise"
     language: str = "English"
-    max_caption_chars: int = 300
+    max_caption_chars: int = Field(default=300, ge=20)
     emoji_level: str = "low"
     base_hashtags: list[str] = Field(default_factory=list)
-    max_hashtags: int = 12
+    max_hashtags: int = Field(default=12, ge=0)
 
 
 class Persona(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     tagline: str = ""
     bio: str = ""
     style: VisualStyle
@@ -88,6 +88,10 @@ class Config(BaseModel):
 
 
 def load_config(path: str | Path) -> Config:
-    """Load and validate a persona YAML file."""
+    """Load and validate a persona YAML file.
+
+    Relative paths in the file (output_dir) stay relative to the folder the
+    command is run from, not to the YAML file.
+    """
     raw = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     return Config.model_validate(raw)

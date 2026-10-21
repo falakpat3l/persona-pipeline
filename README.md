@@ -1,27 +1,41 @@
 # persona-pipeline
 
 [![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-1.0.2-7aa2f7)
+![version](https://img.shields.io/badge/version-1.1.0-7aa2f7)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![status](https://img.shields.io/badge/status-complete-2ea44f)
 
-A multi-stage AI orchestration pipeline that turns a one-line topic into a
-ready-to-post image, caption, hashtags and alt text for a **virtual persona**,
-while keeping the persona's look and voice consistent across every post.
+persona-pipeline turns a one-line topic into a ready-to-post image, caption,
+hashtags and alt text for a virtual persona described in one YAML file. A text
+model writes the image prompt, an image model draws it, a vision model scores the
+result and sends weak images back for another try, and a caption writer finishes
+the post in the persona's voice. Every model sits behind a small interface, so
+Gemini, the local Draw Things app or the offline mock backends can be swapped
+through config without touching pipeline code.
 
-Each step is handled by a different AI role (writer, image model, vision critic),
-and every model sits behind a small interface, so vendors can be swapped through
-config without touching pipeline code.
+> **Status: complete (v1.1.0), maintained only for fixes.** No new features are
+> planned. Bug reports are welcome.
 
-```mermaid
-flowchart LR
-    B[Brief<br/>topic + angle] --> P[Prompt writer<br/>LLM]
-    P --> G[Image generator<br/>diffusion model]
-    G --> C{Critic<br/>vision model}
-    C -- score below threshold --> P
-    C -- pass --> W[Caption writer<br/>LLM]
-    W --> K[Packager]
-    K --> O[(post.png<br/>caption.txt<br/>manifest.json)]
+## How it works
+
+```text
+  topic
+    |
+    v
+  1. prompt_writer     writes the image prompt              (text model)
+    |
+    v
+  2. image_generator   draws the picture                    (image model)
+    |
+    v
+  3. critic            scores it out of 10                  (vision model)
+    |    score below the threshold and attempts left?
+    |    yes: send the critic's notes back to step 1 and try again
+    v    no: keep the best-scoring image
+  4. caption_writer    writes caption, hashtags, alt text   (text model)
+    |
+    v
+  5. packager          saves post.png, caption.txt, alt_text.txt, manifest.json
 ```
 
 The critic loop is the core of the orchestration: a vision model scores every
@@ -58,34 +72,37 @@ that loop into a traceable, testable pipeline.
 
 ## Quick start
 
+This works offline with the built-in mock backends: no API key, no network, no GPU.
+You need Python 3.10 or newer.
+
 ```bash
 git clone https://github.com/falakpat3l/persona-pipeline.git
 cd persona-pipeline
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
-persona-pipeline run --persona personas/example.yaml --topic "Three tiny habits for deep focus"
+persona-pipeline run --persona personas/example.yaml --topic "Desk reset"
 ```
 
 Output:
 
 ```text
-job 20260930-122615-desk-reset started: Desk reset
-  prompt_writer    ok         0.5 ms  new, 244 chars via mock
-  image_generator  ok        60.0 ms  1080x1350 via mock (attempt 1)
-  critic           ok         0.2 ms  score 6.1 (below threshold) via mock
+job 20261021-102215-desk-reset started: Desk reset
+  prompt_writer    ok         0.4 ms  new, 244 chars via mock
+  image_generator  ok        50.1 ms  1080x1350 via mock (attempt 1)
+  critic           ok         0.1 ms  score 6.1 (below threshold) via mock
   prompt_writer    ok         0.1 ms  revised with critic notes, 328 chars via mock
-  image_generator  ok        60.4 ms  1080x1350 via mock (attempt 2)
+  image_generator  ok        51.3 ms  1080x1350 via mock (attempt 2)
   critic           ok         0.2 ms  score 8.9 (pass) via mock
-  review_loop      ok       123.3 ms  best 8.9 from attempt 2 of 2 (passed)
+  review_loop      ok       105.7 ms  best 8.9 from attempt 2 of 2 (passed)
   caption_writer   ok         0.2 ms  63 chars, 4 hashtags
-  packager         ok         0.3 ms  ready in outputs/20260930-122615-desk-reset
+  packager         ok         0.4 ms  ready in outputs/20261021-102215-desk-reset
 ```
 
 Each run gets its own folder:
 
 ```text
-outputs/20260930-122615-desk-reset/
+outputs/20261021-102215-desk-reset/
 ├── image_01.png     # every attempt is kept
 ├── image_02.png
 ├── post.png         # the best-scoring image
@@ -93,6 +110,13 @@ outputs/20260930-122615-desk-reset/
 ├── alt_text.txt     # accessibility text
 └── manifest.json    # full trace: brief, every attempt's prompt and score, timings
 ```
+
+The mock images are colour gradients with the prompt written on them, and the
+mock critic gives a repeatable score, so you can watch the whole loop work. To
+make your own persona, copy `personas/example.yaml` and edit it.
+
+Exit codes: `0` success, `1` the run or a `doctor` check failed, `2` bad input
+(missing or invalid persona file, unknown backend), `130` stopped with Ctrl+C.
 
 ## Backends
 
@@ -183,6 +207,7 @@ writes to the shared `PostJob`:
 ```python
 from persona_pipeline.stages import Stage
 
+
 class Watermark(Stage):
     name = "watermark"
 
@@ -202,7 +227,7 @@ pytest
 ruff check .
 ```
 
-67 tests cover the orchestrator, the critic loop, every backend and the CLI.
+74 tests cover the orchestrator, the critic loop, every backend and the CLI.
 Real services are replaced by fakes (a fake Gemini client and a tiny local HTTP
 server that behaves like Draw Things), so the suite runs offline in a few seconds
 and on every push through GitHub Actions.
@@ -225,9 +250,20 @@ and on every push through GitHub Actions.
 
 ## Status
 
-**v1.0 is complete.** It covers the full loop: brief, prompt, image, critique,
-revision, caption and packaging, with Gemini and Draw Things backends.
-Ideas that were deliberately left out of v1.0 are listed in [ROADMAP.md](ROADMAP.md).
+**Complete (v1.1.0), maintained only for fixes.** It covers the full loop: brief,
+prompt, image, critique, revision, caption and packaging, with mock, Gemini and
+Draw Things backends. It was built in five small milestones (skeleton, Gemini
+text, critic loop, image backends, release); see [CHANGELOG.md](CHANGELOG.md).
+
+### Possible extensions
+
+Not planned, but the code is shaped so these would be small additions:
+
+- Batch mode: a content calendar from a CSV file, with a run summary
+- An HTML contact sheet comparing every attempt side by side
+- Cost and token tracking per run
+- Resuming a failed job from its `manifest.json`
+- More backends (one new file in `backends/` plus one registry line each)
 
 ## License
 

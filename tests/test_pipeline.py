@@ -154,3 +154,41 @@ def test_cli_friendly_error_for_invalid_persona(tmp_path, capsys):
     bad.write_text("persona:\n  name: Only a name\n")  # style is missing
     assert main(["doctor", "--persona", str(bad)]) == 2
     assert "not valid" in capsys.readouterr().err
+
+
+def test_cli_unknown_backend_is_a_short_error(tmp_path, capsys):
+    args = ["run", "--persona", "personas/example.yaml", "--topic", "x", "--out", str(tmp_path)]
+    assert main([*args, "--text", "nope"]) == 2
+    err = capsys.readouterr().err
+    assert "Unknown text backend 'nope'" in err
+    assert "Traceback" not in err
+
+
+def test_cli_folder_instead_of_persona_file(capsys):
+    assert main(["run", "--persona", "personas", "--topic", "x"]) == 2
+    assert "got a folder" in capsys.readouterr().err
+
+
+def test_cli_rejects_blank_topic(capsys):
+    assert main(["run", "--persona", "personas/example.yaml", "--topic", "  "]) == 2
+    assert "--topic" in capsys.readouterr().err
+
+
+def test_doctor_flags_unknown_backend(tmp_path, capsys):
+    text = Path("personas/example.yaml").read_text().replace("image: mock", "image: dall-e")
+    persona = tmp_path / "p.yaml"
+    persona.write_text(text)
+    assert main(["doctor", "--persona", str(persona)]) == 1
+    assert "image backend 'dall-e'" in capsys.readouterr().out
+
+
+def test_config_rejects_nonsense_caption_limits(tmp_path):
+    from pydantic import ValidationError
+
+    from persona_pipeline.config import load_config
+
+    text = Path("personas/example.yaml").read_text().replace("max_hashtags: 10", "max_hashtags: -1")
+    persona = tmp_path / "p.yaml"
+    persona.write_text(text)
+    with pytest.raises(ValidationError):
+        load_config(persona)

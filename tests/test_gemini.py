@@ -316,3 +316,14 @@ def test_gemini_image_retries_when_no_image_comes_back(tmp_path):
     backend = GeminiImage(PipelineSettings(), client=client)
     backend.generate(ImagePrompt(positive="x"), tmp_path / "i.png")
     assert len(client.calls) == 2
+
+
+def test_gemini_image_that_is_not_an_image_is_a_backend_error(tmp_path):
+    from persona_pipeline.backends.base import BackendError
+    from persona_pipeline.backends.gemini import GeminiImage
+    from persona_pipeline.models import ImagePrompt
+
+    client = ImageClient([_image_reply(b"definitely not a png")])
+    backend = GeminiImage(PipelineSettings(), client=client)
+    with pytest.raises(BackendError, match="not an image"):
+        backend.generate(ImagePrompt(positive="x"), tmp_path / "i.png")

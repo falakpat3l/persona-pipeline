@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.1.0 (2026-10-21)
+
+Final release. The project is complete and maintained only for fixes.
+
+Fixes:
+
+- An unknown backend name (for example `--text nope`) printed a traceback; it is
+  now a one-line error with the list of valid names, and exit code 2
+- Passing a folder as `--persona`, or an `--out` path that is a file, printed a
+  traceback; both are now short errors with exit code 2
+- `doctor` said "All good." for a persona file with a misspelled backend name; it
+  now flags it
+- An empty `--topic` is rejected instead of creating a folder named `post`
+- Ctrl+C stops cleanly with exit code 130
+- A non-image reply from the Gemini image model, or a non-JSON reply from
+  whatever is listening at `DRAWTHINGS_URL`, now raises a readable `BackendError`
+- Persona files are checked for an empty `name`, `max_caption_chars` below 20 and
+  a negative `max_hashtags`
+- "best of 1 attempts" now reads "best of 1 attempt"
+- Removed a stray screenshot that was committed by mistake
+
+Docs and CI:
+
+- README: one-paragraph summary, a text diagram of the stages, a no-key quick
+  start with the mock backends, exit codes, and a "Possible extensions" section
+  that replaces `ROADMAP.md`
+- GitHub Actions now also tests Python 3.13
+- 7 new tests (74 in total)
+
 ## 1.0.2 (2026-10-07)
 
 Easier to read and work on. No change in behaviour.

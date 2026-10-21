@@ -8,11 +8,13 @@ You give it a topic. It gives you back a folder with an image, a caption, hashta
 
 ## Run it
 
-1. `pip install -e ".[gemini,dev]"`
+1. `pip install -e ".[dev]"` (add `gemini` inside the brackets later, for real models)
 2. `persona-pipeline run --persona personas/example.yaml --topic "calm mornings"`
 3. Open the new folder inside `outputs/`.
 
 With the example file everything runs on fake ("mock") models, so it works offline with no key.
+
+This project is complete (v1.1.0) and only gets bug fixes. Ideas for extending it are under "Possible extensions" in the README.
 
 ## The big picture
 

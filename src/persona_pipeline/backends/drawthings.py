@@ -98,15 +98,20 @@ class DrawThingsImage:
                 f"Draw Things took longer than {self.settings.timeout_s:.0f}s. Try fewer steps, "
                 "a faster model, or a smaller size_scale in the persona file."
             ) from exc
+        except ValueError as exc:  # json.JSONDecodeError and UnicodeDecodeError
+            raise BackendError(
+                f"Something at {self.base_url} answered, but not like Draw Things does. "
+                "Check DRAWTHINGS_URL and the port in the app's API Server setting."
+            ) from exc
 
-        images = reply.get("images") or []
+        images = reply.get("images") if isinstance(reply, dict) else None
         if not images:
             raise BackendError(
                 "Draw Things finished but returned no image. Some models only return images "
                 "while a project is open: open or create a project in Draw Things and retry."
             )
         try:
-            data = base64.b64decode(images[0].split(",", 1)[-1], validate=True)
+            data = base64.b64decode(str(images[0]).split(",", 1)[-1], validate=True)
         except (binascii.Error, ValueError) as exc:
             raise BackendError("Draw Things returned an image that is not valid base64") from exc
 

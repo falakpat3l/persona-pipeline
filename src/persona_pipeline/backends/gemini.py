@@ -263,6 +263,9 @@ class GeminiImage(_GeminiBase):
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(data)
-        with Image.open(out_path) as img:
-            width, height = img.size
+        try:
+            with Image.open(out_path) as img:
+                width, height = img.size
+        except OSError as exc:
+            raise BackendError("Gemini returned data that is not an image") from exc
         return GeneratedImage(path=out_path, width=width, height=height, backend=self.name)

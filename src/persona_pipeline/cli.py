@@ -1,7 +1,11 @@
 """Command line interface.
 
 persona-pipeline run --persona personas/example.yaml --topic "morning routines"
+persona-pipeline doctor --persona personas/example.yaml
 persona-pipeline backends
+
+Exit codes: 0 success, 1 the run (or doctor check) failed, 2 bad input or setup,
+130 stopped with Ctrl+C.
 """
 
 from __future__ import annotations
@@ -22,6 +26,9 @@ from persona_pipeline.pipeline import Pipeline
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    if not args.topic.strip():
+        print("Error: --topic cannot be empty.", file=sys.stderr)
+        return 2
     config = load_config(args.persona)
     if args.text:
         config.pipeline.backends.text = args.text
@@ -37,7 +44,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     print(f"Job:     {job.job_id}")
     print(f"Status:  {'OK' if job.succeeded else 'FAILED'}")
     if job.critique:
-        print(f"Score:   {job.critique.score:.1f} (best of {len(job.attempts)} attempts)")
+        tries = len(job.attempts)
+        print(f"Score:   {job.critique.score:.1f} (best of {tries} attempt{'s' * (tries != 1)})")
     print(f"Output:  {job.output_dir}")
     if job.caption:
         print()
@@ -69,6 +77,14 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         f"Persona: {config.persona.name}  (text={choice.text}, image={choice.image}, "
         f"vision={choice.vision})"
     )
+    for role in ("text", "image", "vision"):
+        name = getattr(choice, role)
+        if name not in backends.available(role):
+            report(
+                False,
+                f"{role} backend '{name}' exists",
+                f"Use one of: {', '.join(backends.available(role))}",
+            )
     if "gemini" in (choice.text, choice.image, choice.vision):
         has_key = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
         report(has_key, "Gemini API key found", "Add GEMINI_API_KEY=... to .env in this folder.")
@@ -135,8 +151,17 @@ def main(argv: list[str] | None = None) -> int:
         return args.func(args)
     except FileNotFoundError as exc:
         print(f"Error: file not found: {exc.filename}", file=sys.stderr)
+    except IsADirectoryError as exc:
+        print(f"Error: expected a file but got a folder: {exc.filename}", file=sys.stderr)
     except (yaml.YAMLError, ValidationError) as exc:
         print(f"Error: the persona file is not valid.\n{exc}", file=sys.stderr)
+    except backends.BackendError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+    except OSError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+    except KeyboardInterrupt:
+        print("\nStopped.", file=sys.stderr)
+        return 130
     return 2
 
 
