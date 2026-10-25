@@ -44,7 +44,7 @@ class CaptionWriter(Stage):
         persona = ctx.config.persona
         voice = persona.voice
         system = (
-            f"You write Instagram captions as {persona.name}. {persona.bio} "
+            f"You write social media captions as {persona.name}. {persona.bio} "
             f"Tone: {voice.tone}. Language: {voice.language}. Emoji use: {voice.emoji_level}. "
             f"Keep the caption under {voice.max_caption_chars} characters. "
             "Open with a short hook line, give one useful idea about the topic, and end with "

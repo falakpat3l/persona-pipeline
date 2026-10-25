@@ -28,7 +28,7 @@ from persona_pipeline.config import PipelineSettings
 from persona_pipeline.models import GeneratedImage, ImagePrompt
 
 # Multiples of 64 (diffusion models need that) from the standard SDXL size buckets,
-# as close as they get to each Instagram aspect ratio.
+# as close as they get to each common feed and story aspect ratio.
 SIZES = {
     "1:1": (1024, 1024),
     "4:5": (896, 1152),
