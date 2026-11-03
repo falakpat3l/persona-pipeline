@@ -1,7 +1,7 @@
 # persona-pipeline
 
 [![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-1.1.0-7aa2f7)
+![version](https://img.shields.io/badge/version-1.1.1-7aa2f7)
 ![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![status](https://img.shields.io/badge/status-complete-2ea44f)
 
@@ -13,7 +13,7 @@ the post in the persona's voice. Every model sits behind a small interface, so
 Gemini, the local Draw Things app or the offline mock backends can be swapped
 through config without touching pipeline code.
 
-> **Status: complete (v1.1.0), maintained only for fixes.** No new features are
+> **Status: complete (v1.1.1), maintained only for fixes.** No new features are
 > planned. Bug reports are welcome.
 
 ## How it works
@@ -162,6 +162,8 @@ git-ignored, so the key never lands in the repo.
    ```
 
 Image size, steps, model and timeout live under `drawthings:` in the persona file.
+For safety the URL may only point at this computer. To use Draw Things on another
+Mac on your network, add its address to `allowed_hosts` under `drawthings:`.
 `size_scale: 0.75` makes images smaller and faster on lighter Macs. Sizes are
 always multiples of 64, which diffusion models need.
 
@@ -185,6 +187,7 @@ src/persona_pipeline/
 ├── models.py            # PostJob and the data passed between stages
 ├── retry.py             # exponential backoff with jitter
 ├── env.py               # tiny .env loader for API keys
+├── safety.py            # hides API keys, cleans model output, checks paths and URLs
 ├── backends/
 │   ├── base.py          # TextBackend, ImageBackend, VisionBackend interfaces
 │   ├── mock.py          # offline backends used by default and in tests
@@ -227,7 +230,8 @@ pytest
 ruff check .
 ```
 
-74 tests cover the orchestrator, the critic loop, every backend and the CLI.
+130 tests cover the orchestrator, the critic loop, every backend, the CLI and the
+safety checks.
 Real services are replaced by fakes (a fake Gemini client and a tiny local HTTP
 server that behaves like Draw Things), so the suite runs offline in a few seconds
 and on every push through GitHub Actions.
@@ -245,12 +249,15 @@ and on every push through GitHub Actions.
 - **Fail loudly, but readably.** Known problems (missing key, app not running)
   raise a `BackendError` with a fix-it hint; unexpected ones keep the traceback.
   `persona-pipeline doctor` checks the setup before a run.
+- **Model output is untrusted text.** Replies are size-capped and cleaned of
+  control characters, never run as code and never used as file names. API keys
+  are hidden from every log line, error message and `manifest.json`.
 - **Keep the best, not the last.** The critic loop stores every attempt and
   packages the highest-scoring image, even if none reached the threshold.
 
 ## Status
 
-**Complete (v1.1.0), maintained only for fixes.** It covers the full loop: brief,
+**Complete (v1.1.1), maintained only for fixes.** It covers the full loop: brief,
 prompt, image, critique, revision, caption and packaging, with mock, Gemini and
 Draw Things backends. It was built in five small milestones (skeleton, Gemini
 text, critic loop, image backends, release); see [CHANGELOG.md](CHANGELOG.md).

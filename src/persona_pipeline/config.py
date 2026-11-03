@@ -66,6 +66,9 @@ class DrawThingsSettings(BaseModel):
     """Local image generation with the Draw Things app (its API Server must be on)."""
 
     url: str = "http://127.0.0.1:7860"  # DRAWTHINGS_URL in .env overrides this
+    # The url (and DRAWTHINGS_URL) may only point at these hosts. Add a LAN address
+    # here to use Draw Things on another computer.
+    allowed_hosts: list[str] = Field(default_factory=lambda: ["127.0.0.1", "localhost", "::1"])
     model: str | None = Field(default=None, description="model file name; None = app's current")
     steps: int = Field(default=20, ge=1, le=150)
     cfg_scale: float = Field(default=7.0, ge=1, le=30)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from persona_pipeline.models import Critique, PostJob
+from persona_pipeline.safety import untrusted_text
 from persona_pipeline.stages.base import Stage, StageContext
 
 SCHEMA = {
@@ -13,6 +14,8 @@ SCHEMA = {
     },
     "required": ["score", "notes"],
 }
+MAX_NOTES = 8
+MAX_NOTE_CHARS = 500
 
 
 def build_rubric(job: PostJob, ctx: StageContext) -> str:
@@ -42,12 +45,19 @@ class Critic(Stage):
         try:
             score = float(data["score"])
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"critic returned a non-numeric score: {data['score']!r}") from exc
+            shown = untrusted_text(repr(data["score"]), 80)
+            raise ValueError(f"critic returned a non-numeric score: {shown}") from exc
+        if score != score:  # NaN
+            raise ValueError("critic returned a score that is not a number")
         score = min(10.0, max(0.0, score))  # models sometimes answer 10.5 or -1
+        notes = data.get("notes", [])
+        if not isinstance(notes, list):
+            notes = [notes]
+        notes = [untrusted_text(n, MAX_NOTE_CHARS).strip() for n in notes[:MAX_NOTES]]
         job.critique = Critique(
             score=score,
             passed=score >= ctx.config.pipeline.critic_threshold,
-            notes=[str(n) for n in data.get("notes", []) if str(n).strip()],
+            notes=[n for n in notes if n],
         )
         verdict = "pass" if job.critique.passed else "below threshold"
         return f"score {score:.1f} ({verdict}) via {ctx.vision.name}"

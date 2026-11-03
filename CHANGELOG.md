@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.1.1 (2026-11-02)
+
+A security review. No new features.
+
+Security:
+
+- API keys are hidden (shown as `[redacted]`) in every log line, error message,
+  traceback and `manifest.json`, including log lines from the HTTP libraries
+- Draw Things: the URL must be `http` or `https` and point at this computer.
+  Other hosts must be listed in the new `drawthings.allowed_hosts` setting, so a
+  changed `.env` alone cannot send prompts elsewhere. URLs with a user name,
+  password, `?` or `#` are refused, and `doctor` checks the URL before connecting
+- Draw Things: redirects and proxies are not followed, the reply is capped at
+  64 MB, and `timeout_s` now limits the whole reply, so a slow trickle cannot
+  hang a run
+- Gemini: replies over 200,000 characters and images over 32 MB are refused
+- Model output is treated as untrusted text: control characters (terminal
+  escape codes) are removed, and prompts, captions, alt text, hashtags and critic
+  notes have length caps. A score of `NaN` is rejected
+- The job folder is always a plain name inside the output folder, and an image
+  backend cannot save, or get packaged, outside it
+- Images that are too large to open safely (Pillow's decompression bomb check)
+  now give a readable error
+- Dependencies, checked with pip-audit: Pillow 13.0 or newer on Python 3.11+
+  (12.3 on Python 3.10, the newest Pillow that supports it), pytest 9.0.3 or
+  newer for development, setuptools 84.1 or newer to build
+
+Other:
+
+- GitHub Actions: `actions/checkout` and `actions/setup-python` updated to v7,
+  and a new job runs pip-audit on every push
+- `pyproject.toml` uses the SPDX `license = "MIT"` form that new setuptools expects
+- 56 new tests (130 in total)
+
 ## 1.1.0 (2026-10-21)
 
 Final release. The project is complete and maintained only for fixes.

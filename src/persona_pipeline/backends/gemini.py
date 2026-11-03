@@ -32,6 +32,7 @@ from persona_pipeline.backends.base import BackendError
 from persona_pipeline.config import PipelineSettings
 from persona_pipeline.models import GeneratedImage, ImagePrompt
 from persona_pipeline.retry import with_retries
+from persona_pipeline.safety import redact
 
 log = logging.getLogger("persona_pipeline")
 
@@ -40,6 +41,9 @@ API_KEY_VARS = ("GEMINI_API_KEY", "GOOGLE_API_KEY")
 # and server-side errors. Anything else (like 400 bad request) is our mistake,
 # so retrying would only fail again.
 RETRYABLE_STATUS = {408, 429, 500, 502, 503, 504}
+# Upper limits on what we accept from the model. Real replies are far smaller.
+MAX_REPLY_CHARS = 200_000  # a JSON reply for one prompt, caption or critique
+MAX_REPLY_IMAGE_BYTES = 32 * 1024 * 1024
 
 
 class MalformedOutput(BackendError):
@@ -60,6 +64,8 @@ def parse_json_reply(text: str | None, schema: dict[str, Any]) -> dict:
     """Parse a model reply into a dict and check the schema's required keys."""
     if not text:
         raise MalformedOutput("empty reply")
+    if len(text) > MAX_REPLY_CHARS:
+        raise MalformedOutput(f"reply is too long ({len(text)} characters)")
     cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
     try:
         data = json.loads(cleaned)
@@ -171,7 +177,9 @@ class _GeminiBase:
                 is_last = i == len(chain) - 1
                 if is_last or not is_retryable(exc):
                     raise
-                log.warning("  %s unavailable (%s), falling back to %s", current, exc, chain[i + 1])
+                log.warning(
+                    "  %s unavailable (%s), falling back to %s", current, redact(exc), chain[i + 1]
+                )
                 continue
             self.last_model = current
             if current != model:
@@ -261,11 +269,13 @@ class GeminiImage(_GeminiBase):
             is_retryable=is_retryable,
             label=f"gemini:image:{model}",
         )
+        if not isinstance(data, bytes) or len(data) > MAX_REPLY_IMAGE_BYTES:
+            raise BackendError("Gemini returned an image that is too large or not raw bytes")
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(data)
         try:
             with Image.open(out_path) as img:
                 width, height = img.size
-        except OSError as exc:
+        except (OSError, Image.DecompressionBombError) as exc:
             raise BackendError("Gemini returned data that is not an image") from exc
         return GeneratedImage(path=out_path, width=width, height=height, backend=self.name)

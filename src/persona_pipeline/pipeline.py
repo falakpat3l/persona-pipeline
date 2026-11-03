@@ -8,6 +8,8 @@ Design notes
 - Generation is a feedback loop: a vision critic scores each image, and a weak
   image sends the critic's notes back to the prompt writer for another try. The
   best-scoring attempt is kept, even if none reached the threshold.
+- Error text is passed through redact() before it is logged or saved, so an API
+  key can never end up in the terminal or in manifest.json.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+import traceback
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,6 +26,7 @@ from pathlib import Path
 from persona_pipeline import backends
 from persona_pipeline.config import Config
 from persona_pipeline.models import Attempt, Brief, PostJob, StageEvent, StageStatus, utcnow
+from persona_pipeline.safety import redact, safe_child
 from persona_pipeline.stages import (
     CaptionWriter,
     Critic,
@@ -60,6 +64,7 @@ def default_steps() -> list[Step]:
 
 
 def slugify(text: str, max_len: int = 40) -> str:
+    """Lowercase ASCII letters, digits and dashes only, so it is always a safe folder name."""
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
     return slug[:max_len].rstrip("-") or "post"
 
@@ -89,7 +94,7 @@ class Pipeline:
         base, n = job_id, 2
         while (root / job_id).exists():
             job_id, n = f"{base}-{n}", n + 1
-        out = root / job_id
+        out = safe_child(root, job_id)  # the job folder can never land outside root
         out.mkdir(parents=True)
         return PostJob(job_id=job_id, persona=self.config.persona.name, brief=brief, output_dir=out)
 
@@ -160,12 +165,13 @@ class Pipeline:
             detail = stage.run(job, self.ctx)
             status = StageStatus.OK
         except Exception as exc:  # record every failure in the trace
-            detail = f"{type(exc).__name__}: {exc}"
+            detail = redact(f"{type(exc).__name__}: {exc}")
             status = StageStatus.FAILED
             if isinstance(exc, backends.BackendError):
-                log.error("stage %s failed: %s", stage.name, exc)  # known, readable error
-            else:
-                log.exception("stage %s failed", stage.name)  # unexpected: show traceback
+                log.error("stage %s failed: %s", stage.name, redact(exc))  # known, readable error
+            else:  # unexpected: show the traceback, with any key hidden
+                trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+                log.error("stage %s failed\n%s", stage.name, redact(trace).rstrip())
         duration = (time.perf_counter() - t0) * 1000
         job.events.append(
             StageEvent(
@@ -185,5 +191,5 @@ class Pipeline:
         if job.output_dir is None:
             return None
         path = job.output_dir / "manifest.json"
-        path.write_text(job.model_dump_json(indent=2), encoding="utf-8")
+        path.write_text(redact(job.model_dump_json(indent=2)), encoding="utf-8")
         return path

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from persona_pipeline.models import ImagePrompt, PostJob
+from persona_pipeline.safety import untrusted_text
 from persona_pipeline.stages.base import Stage, StageContext
 
 ASPECT_BY_FORMAT = {"portrait": "4:5", "square": "1:1", "story": "9:16"}
+MAX_PROMPT_CHARS = 4000  # model output is untrusted text: cap it
 
 SYSTEM = """\
 You are the art director for a virtual persona's social media account.
@@ -63,8 +65,8 @@ class PromptWriter(Stage):
         fix = critic_feedback(job)
         data = ctx.text.complete_json("write_prompt", SYSTEM, build_prompt(job, ctx, fix), SCHEMA)
         job.prompt = ImagePrompt(
-            positive=data["positive"],
-            negative=data.get("negative", ""),
+            positive=untrusted_text(data["positive"], MAX_PROMPT_CHARS),
+            negative=untrusted_text(data.get("negative", ""), MAX_PROMPT_CHARS),
             aspect_ratio=ASPECT_BY_FORMAT.get(job.brief.format, "4:5"),
         )
         mode = "revised with critic notes" if fix else "new"

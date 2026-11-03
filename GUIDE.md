@@ -14,7 +14,7 @@ You give it a topic. It gives you back a folder with an image, a caption, hashta
 
 With the example file everything runs on fake ("mock") models, so it works offline with no key.
 
-This project is complete (v1.1.0) and only gets bug fixes. Ideas for extending it are under "Possible extensions" in the README.
+This project is complete (v1.1.1) and only gets bug fixes. Ideas for extending it are under "Possible extensions" in the README.
 
 ## The big picture
 
@@ -44,6 +44,7 @@ Every step reads from and writes to one shared object, the `PostJob`. After each
 | `src/persona_pipeline/models.py` | The shapes of the data passed between steps (prompt, image, critique, caption) | store a new piece of information |
 | `src/persona_pipeline/retry.py` | Try again after a short wait when an API is busy | change how patient it is |
 | `src/persona_pipeline/env.py` | Reads your `.env` file (where the API key lives) | rarely |
+| `src/persona_pipeline/safety.py` | Hides API keys in logs and errors, cleans model output, checks file paths and URLs | rarely |
 | `tests/` | Checks that everything still works | after any change |
 
 ## Common changes

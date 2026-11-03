@@ -23,6 +23,7 @@ from persona_pipeline.config import load_config
 from persona_pipeline.env import load_dotenv
 from persona_pipeline.models import Brief
 from persona_pipeline.pipeline import Pipeline
+from persona_pipeline.safety import RedactFilter, UnsafeValue, check_local_url, redact
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -62,7 +63,8 @@ def _cmd_backends(_: argparse.Namespace) -> int:
 def _cmd_doctor(args: argparse.Namespace) -> int:
     """Check that every backend the persona file asks for is ready to use."""
     import os
-    import urllib.request
+
+    from persona_pipeline.backends.drawthings import open_url
 
     config = load_config(args.persona)
     choice = config.pipeline.backends
@@ -94,10 +96,18 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             report(True, "Gemini library installed")
         except ImportError:
             report(False, "Gemini library installed", 'Run: pip install -e ".[gemini]"')
+    url = None
     if choice.image == "drawthings":
-        url = (os.environ.get("DRAWTHINGS_URL") or config.pipeline.drawthings.url).rstrip("/")
+        settings = config.pipeline.drawthings
         try:
-            with urllib.request.urlopen(f"{url}/sdapi/v1/options", timeout=5):
+            url = check_local_url(
+                os.environ.get("DRAWTHINGS_URL") or settings.url, settings.allowed_hosts
+            )
+        except UnsafeValue as exc:
+            report(False, "Draw Things URL is allowed", str(exc))
+    if url:
+        try:
+            with open_url(f"{url}/sdapi/v1/options", timeout=5):
                 pass
             report(True, f"Draw Things answering at {url}")
         except Exception:
@@ -136,6 +146,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _error(message: str) -> None:
+    print(f"Error: {redact(message)}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     load_dotenv()  # picks up GEMINI_API_KEY etc. from ./.env if present
@@ -143,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(message)s",
     )
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(RedactFilter())  # API keys never reach the terminal or a log file
     if not args.verbose:
         # Keep the output to our own stage log; SDK and HTTP chatter only with -v.
         for noisy in ("httpx", "httpcore", "google_genai", "google.genai"):
@@ -150,15 +166,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except FileNotFoundError as exc:
-        print(f"Error: file not found: {exc.filename}", file=sys.stderr)
+        _error(f"file not found: {exc.filename}")
     except IsADirectoryError as exc:
-        print(f"Error: expected a file but got a folder: {exc.filename}", file=sys.stderr)
+        _error(f"expected a file but got a folder: {exc.filename}")
     except (yaml.YAMLError, ValidationError) as exc:
-        print(f"Error: the persona file is not valid.\n{exc}", file=sys.stderr)
-    except backends.BackendError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-    except OSError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _error(f"the persona file is not valid.\n{exc}")
+    except (backends.BackendError, UnsafeValue, OSError) as exc:
+        _error(f"{exc}")
     except KeyboardInterrupt:
         print("\nStopped.", file=sys.stderr)
         return 130

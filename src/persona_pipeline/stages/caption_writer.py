@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from persona_pipeline.models import Caption, PostJob
+from persona_pipeline.safety import untrusted_text
 from persona_pipeline.stages.base import Stage, StageContext
 
 SCHEMA = {
@@ -14,9 +15,12 @@ SCHEMA = {
     },
     "required": ["text", "hashtags", "alt_text"],
 }
+MAX_ALT_TEXT_CHARS = 1000
+MAX_TAG_CHARS = 100
 
 
 def _clean_tag(tag: str) -> str:
+    tag = str(tag)[:MAX_TAG_CHARS]
     return "".join(ch for ch in tag.lstrip("#") if ch.isalnum() or ch == "_").lower()
 
 
@@ -65,14 +69,16 @@ class CaptionWriter(Stage):
 
         # The persona's base tags always make it in; model tags fill the remaining slots.
         base = _unique(_clean_tag(t) for t in voice.base_hashtags)[: voice.max_hashtags]
-        extra = [
-            t for t in _unique(_clean_tag(t) for t in data.get("hashtags", [])) if t not in base
-        ]
+        model_tags = data.get("hashtags", [])
+        if not isinstance(model_tags, list):
+            model_tags = []
+        extra = [t for t in _unique(_clean_tag(t) for t in model_tags[:100]) if t not in base]
         tags = extra[: voice.max_hashtags - len(base)] + base
 
+        limit = voice.max_caption_chars
         job.caption = Caption(
-            text=_trim(data["text"], voice.max_caption_chars),
+            text=_trim(untrusted_text(data["text"], 10 * limit), limit),
             hashtags=tags,
-            alt_text=data.get("alt_text", ""),
+            alt_text=untrusted_text(data.get("alt_text", ""), MAX_ALT_TEXT_CHARS),
         )
         return f"{len(job.caption.text)} chars, {len(job.caption.hashtags)} hashtags"

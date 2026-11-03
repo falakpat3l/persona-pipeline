@@ -1,19 +1,19 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=84.1", "wheel"]  # older setuptools have known CVEs
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-pipeline"
-version = "1.1.0"
+version = "1.1.1"
 description = "A multi-stage AI orchestration pipeline that turns a topic into a ready-to-post image, caption and hashtags for a virtual persona."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Falak Patel" }]
 keywords = ["ai", "orchestration", "pipeline", "image-generation", "llm", "gemini"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -24,12 +24,14 @@ classifiers = [
 dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6.0",
-    "pillow>=10.1",  # 10.1 added ImageFont.load_default(size=...)
+    # Pillow 13 fixes known CVEs but needs Python 3.11+; 12.3 is the newest for 3.10.
+    "pillow>=13.0; python_version >= '3.11'",
+    "pillow>=12.3; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
 gemini = ["google-genai>=1.40"]  # 1.40 added image_config for image models
-dev = ["pytest>=8.0", "ruff>=0.5"]
+dev = ["pytest>=9.0.3", "ruff>=0.5"]  # pytest 9.0.3 fixes a known CVE
 
 [project.urls]
 Repository = "https://github.com/falakpat3l/persona-pipeline"

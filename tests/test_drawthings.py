@@ -110,7 +110,8 @@ def test_sizes_are_multiples_of_64(aspect, scale, expected):
 
 def test_env_var_overrides_url(monkeypatch):
     monkeypatch.setenv("DRAWTHINGS_URL", "http://10.0.0.5:7860/")
-    assert backend_for("http://127.0.0.1:7860").base_url == "http://10.0.0.5:7860"
+    backend = backend_for("http://127.0.0.1:7860", allowed_hosts=["127.0.0.1", "10.0.0.5"])
+    assert backend.base_url == "http://10.0.0.5:7860"
 
 
 def test_app_not_running_gives_setup_hint(tmp_path, monkeypatch):

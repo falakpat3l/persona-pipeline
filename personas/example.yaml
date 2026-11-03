@@ -44,6 +44,7 @@ pipeline:
     max_retries: 3
   drawthings:
     url: http://127.0.0.1:7860
+    allowed_hosts: [127.0.0.1, localhost, "::1"]  # add a LAN address to use another Mac
     steps: 20          # FLUX.1 Schnell only needs about 4
     cfg_scale: 7.0
     size_scale: 1.0    # 0.75 = smaller, faster images
