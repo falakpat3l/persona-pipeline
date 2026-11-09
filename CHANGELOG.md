@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2 (2026-11-09)
+
+Python 3.10 reached end of life in October 2026, so it is no longer supported.
+
+- Python 3.11 or newer is now required. Tests run on 3.11, 3.12 and 3.13
+- Pillow 13.0 or newer on every supported Python (the 12.3 fallback for 3.10
+  is gone)
+
 ## 1.1.1 (2026-11-02)
 
 A security review. No new features.
