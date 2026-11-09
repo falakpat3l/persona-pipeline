@@ -1,8 +1,8 @@
 # persona-pipeline
 
 [![tests](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml/badge.svg)](https://github.com/falakpat3l/persona-pipeline/actions/workflows/tests.yml)
-![version](https://img.shields.io/badge/version-1.1.1-7aa2f7)
-![python](https://img.shields.io/badge/python-3.10%2B-3776AB)
+![version](https://img.shields.io/badge/version-1.1.2-7aa2f7)
+![python](https://img.shields.io/badge/python-3.11%2B-3776AB)
 ![status](https://img.shields.io/badge/status-complete-2ea44f)
 
 persona-pipeline turns a one-line topic into a ready-to-post image, caption,
@@ -13,7 +13,7 @@ the post in the persona's voice. Every model sits behind a small interface, so
 Gemini, the local Draw Things app or the offline mock backends can be swapped
 through config without touching pipeline code.
 
-> **Status: complete (v1.1.1), maintained only for fixes.** No new features are
+> **Status: complete (v1.1.2), maintained only for fixes.** No new features are
 > planned. Bug reports are welcome.
 
 ## How it works
@@ -73,7 +73,7 @@ that loop into a traceable, testable pipeline.
 ## Quick start
 
 This works offline with the built-in mock backends: no API key, no network, no GPU.
-You need Python 3.10 or newer.
+You need Python 3.11 or newer.
 
 ```bash
 git clone https://github.com/falakpat3l/persona-pipeline.git
@@ -257,7 +257,7 @@ and on every push through GitHub Actions.
 
 ## Status
 
-**Complete (v1.1.1), maintained only for fixes.** It covers the full loop: brief,
+**Complete (v1.1.2), maintained only for fixes.** It covers the full loop: brief,
 prompt, image, critique, revision, caption and packaging, with mock, Gemini and
 Draw Things backends. It was built in five small milestones (skeleton, Gemini
 text, critic loop, image backends, release); see [CHANGELOG.md](CHANGELOG.md).
