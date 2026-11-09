@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-pipeline"
-version = "1.1.1"
+version = "1.1.2"
 description = "A multi-stage AI orchestration pipeline that turns a topic into a ready-to-post image, caption and hashtags for a virtual persona."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Falak Patel" }]
@@ -15,7 +15,6 @@ keywords = ["ai", "orchestration", "pipeline", "image-generation", "llm", "gemin
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -24,9 +23,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2.5",
     "pyyaml>=6.0",
-    # Pillow 13 fixes known CVEs but needs Python 3.11+; 12.3 is the newest for 3.10.
-    "pillow>=13.0; python_version >= '3.11'",
-    "pillow>=12.3; python_version < '3.11'",
+    "pillow>=13.0",  # 13.0 fixes known CVEs
 ]
 
 [project.optional-dependencies]
