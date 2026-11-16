@@ -275,3 +275,7 @@ Not planned, but the code is shaped so these would be small additions:
 ## License
 
 MIT
+
+## How this was built
+
+I specified what this should do, tested it and released it. AI coding assistants wrote most of the code.
